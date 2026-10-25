@@ -595,14 +595,13 @@
     var buttons = $('buttons');
     buttons.innerHTML = '';
     var defs = [
-      ['live_tv', tr('light|Live TV')],
       ['hdmi', tr('HDMI Inputs')],
       ['speaker', 'Áudio: ' + audioOutputName(currentAudioMode)],
       ['settings', tr('light|Settings')]
     ];
-    for (var b = 0; b < 4; b++) {
-      var r = el('button', 'round' + (b === 3 ? ' last' : ''), buttons);
-      r.style.left = (1508 + 88 * b) + 'px';
+    for (var b = 0; b < 3; b++) {
+      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
+      r.style.left = (1596 + 88 * b) + 'px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
       hover(r, Z.TOP, 3 + b);
@@ -783,8 +782,8 @@
 
   function updateAudioTip() {
     var btn = $('buttons');
-    if (!btn || btn.children.length < 4) return;
-    var audioBtn = btn.children[2];
+    if (!btn || btn.children.length < 3) return;
+    var audioBtn = btn.children[1];
     var tip = audioBtn.querySelector('.tip');
     if (tip) tip.textContent = 'Áudio: ' + audioOutputName(currentAudioMode);
   }
@@ -1389,9 +1388,8 @@
     switch (st.zone) {
       case Z.TOP:
         if (st.top < 3) return;
-        if (st.top === 3) { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
-        else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
-        else if (st.top === 5) { cycleAudioOutput(); }
+        if (st.top === 3) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
+        else if (st.top === 4) { cycleAudioOutput(); }
         else openSettings();
         return;
       case Z.CARDS:
@@ -1446,12 +1444,9 @@
         break;
       case Z.TOP:
         if (dx) {
-          var minTop = cards.length ? 0 : 3;
-          st.top = Math.max(minTop, Math.min(6, st.top + dx));
-          if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
+          st.top = Math.max(3, Math.min(5, st.top + dx));
         } else if (dy > 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
-          else st.zone = Z.SHELF;
+          st.zone = Z.SHELF;
         }
         break;
       case Z.DRAWER:
