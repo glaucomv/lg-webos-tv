@@ -10,6 +10,7 @@
 id_rsa*
 webos_rsa*
 /etc/
+backup_local/
 
 # ==========================================
 # CONFIGURAÇÕES PESSOAIS DA APLICAÇÃO
