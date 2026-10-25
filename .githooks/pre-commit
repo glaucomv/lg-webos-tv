@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-Commit Hook: Privacy and Security Guard
+echo "[HOOK] Executando verificacoes de privacidade, seguranca e integridade pre-commit..."
+
+if command -v python >/dev/null 2>&1; then
+    PY_BIN="python"
+elif command -v python3 >/dev/null 2>&1; then
+    PY_BIN="python3"
+elif command -v py >/dev/null 2>&1; then
+    PY_BIN="py"
+else
+    echo "[ERRO] Python nao encontrado no PATH para executar a verificacao de seguranca." >&2
+    exit 1
+fi
+
+$PY_BIN tools/security_guard.py
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "" >&2
+    echo "==========================================================================" >&2
+    echo "[ABORT] COMMIT CANCELADO: Violacoes de privacidade ou erros de sintaxe!" >&2
+    echo "Nenhum dado sensivel pode ser commitado no repositorio." >&2
+    echo "==========================================================================" >&2
+    exit 1
+fi
+
+exit 0

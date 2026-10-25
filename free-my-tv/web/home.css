@@ -53,7 +53,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* MARK: - Background: the first pick's photo, very blurred and almost white (almost black at night). */
 
-#sky { background: #EBEBEF; }
+#sky { background: #0B0B0D; }
 #sky .grad { position: absolute; left: 0; top: 0; width: 100%; height: 100%; -webkit-transition: opacity 2s; transition: opacity 2s; }
 #sky .day { background: -webkit-linear-gradient(top, #F5F5F7, #E2E2E7); background: linear-gradient(#F5F5F7, #E2E2E7); }
 #sky .night {
@@ -61,6 +61,40 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background: radial-gradient(circle at 50% 30%, #161A28 0%, #0A0C13 65%, #05060A 100%);
   opacity: 0;
 }
+
+/* MARK: - Custom Wallpaper & Photo Gallery Layer */
+#wallpaper {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+}
+.wall-pane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center center;
+  opacity: 0;
+  -webkit-transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wall-pane.on { opacity: 1; }
+.wall-mask {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 35%, rgba(11, 11, 14, 0.3) 0%, rgba(5, 6, 10, 0.72) 65%, rgba(2, 3, 5, 0.92) 100%);
+  pointer-events: none;
+}
+
 #sky canvas { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; opacity: 0; -webkit-transition: opacity 0.8s; transition: opacity 0.8s; }
 #sky canvas.on { opacity: 1; }
 #sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.74); -webkit-transition: background-color 2s; transition: background-color 2s; }
@@ -290,11 +324,127 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #spotlight {
   position: absolute;
   left: 80px;
-  top: 240px;
-  max-width: 1200px;
+  top: 210px;
+  width: 1760px;
+  max-width: 1760px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  -webkit-align-items: flex-start;
+  align-items: flex-start;
   pointer-events: none;
-  -webkit-transition: opacity 0.2s ease;
-  transition: opacity 0.2s ease;
+  -webkit-transition: opacity 0.25s ease;
+  transition: opacity 0.25s ease;
+}
+#spot-info {
+  max-width: 950px;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+/* MARK: - Live TV Preview Frame */
+#spot-preview-box {
+  position: relative;
+  width: 520px;
+  height: 293px;
+  margin-right: 40px;
+  opacity: 1;
+  -webkit-transform: scale(1);
+  transform: scale(1);
+  -webkit-transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), -webkit-transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+#spot-preview-box.preview-hidden {
+  opacity: 0;
+  -webkit-transform: scale(0.92);
+  transform: scale(0.92);
+  pointer-events: none;
+}
+
+.preview-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 122, 255, 0.25);
+}
+
+#tv-live-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+.preview-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 12px;
+  background: rgba(220, 38, 38, 0.9);
+  color: #FFF;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+.preview-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FFF;
+  margin-right: 6px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.preview-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 18px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0) 100%);
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+}
+
+.preview-title {
+  color: #FFF;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.preview-sub {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+  line-height: 1.2;
 }
 #spot-badge {
   display: inline-block;

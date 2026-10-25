@@ -20,8 +20,13 @@
   <div id="sky" class="layer">
     <div class="grad day"></div>
     <div class="grad night"></div>
-    <canvas id="bgA" width="48" height="27"></canvas>
-    <canvas id="bgB" width="48" height="27"></canvas>
+    <div id="wallpaper" class="layer">
+      <div id="wallA" class="wall-pane"></div>
+      <div id="wallB" class="wall-pane"></div>
+      <div class="wall-mask"></div>
+    </div>
+    <canvas id="bgA" width="48" height="27" style="display:none"></canvas>
+    <canvas id="bgB" width="48" height="27" style="display:none"></canvas>
     <div class="veil"></div>
     <div class="lift"></div>
   </div>
@@ -33,10 +38,22 @@
       <div id="clock"><span class="time"></span><span class="date"></span></div>
       <div id="buttons"></div>
       <div id="spotlight">
-        <div id="spot-badge"></div>
-        <h2 id="spot-title"></h2>
-        <p id="spot-desc"></p>
-        <div id="spot-hint"></div>
+        <div id="spot-info">
+          <div id="spot-badge"></div>
+          <h2 id="spot-title"></h2>
+          <p id="spot-desc"></p>
+          <div id="spot-hint"></div>
+        </div>
+        <div id="spot-preview-box" class="preview-hidden">
+          <div class="preview-frame">
+            <video id="tv-live-preview" autoplay muted playsinline></video>
+            <div class="preview-badge"><span class="preview-pulse"></span>AO VIVO</div>
+            <div class="preview-bar">
+              <span class="preview-title" id="preview-channel-name">Sintonizador TV Aberta</span>
+              <span class="preview-sub">Pressione OK para tela cheia</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="cards"></div>
     </div>

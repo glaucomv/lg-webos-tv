@@ -23,6 +23,7 @@ def deploy():
         print(f"IPK not found at {ipk_path}. Building first...")
         os.system(f'python "{os.path.join(FREE_MY_TV_DIR, "webos", "build.py")}"')
 
+    socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
@@ -32,7 +33,7 @@ def deploy():
     time.sleep(0.5)
 
     print(f"TV ({TV_IP}) downloading IPK from http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk...")
-    dl_res = telnet_cmd(f"curl -s -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk")
+    dl_res = telnet_cmd(f"curl -s -f -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk", timeout=10)
     print("TV download result:", dl_res)
 
     print("Installing on TV via Luna appInstallService...")

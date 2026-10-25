@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-Push Hook: Privacy and Security Guard
+echo "[HOOK] Executando verificacoes de privacidade, seguranca e integridade pre-push..."
+
+if command -v python >/dev/null 2>&1; then
+    PY_BIN="python"
+elif command -v python3 >/dev/null 2>&1; then
+    PY_BIN="python3"
+elif command -v py >/dev/null 2>&1; then
+    PY_BIN="py"
+else
+    echo "[ERRO] Python nao encontrado no PATH para executar a verificacao de seguranca." >&2
+    exit 1
+fi
+
+$PY_BIN tools/security_guard.py
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "" >&2
+    echo "==========================================================================" >&2
+    echo "[ABORT] PUSH CANCELADO: Violacoes de privacidade ou erros de integridade!" >&2
+    echo "Nenhum dado sensivel pode ser enviado para o GitHub publico." >&2
+    echo "Verifique os detalhes acima e corrija antes de tentar novamente." >&2
+    echo "==========================================================================" >&2
+    exit 1
+fi
+
+exit 0

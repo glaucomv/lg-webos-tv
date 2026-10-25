@@ -22,6 +22,10 @@ lg-webos-tv-workspace/
     ├── tv_root.py            # Cliente de comando remoto via Telnet
     ├── backup_tv_configs.py  # Extrai configs originais e lista de apps da TV
     ├── deploy_to_tv.py       # Compila, transfere e instala o launcher na TV
+    ├── sync_wallpapers.py    # Sincroniza fotos e wallpapers locais para a TV
+    ├── verify_build.py       # Validacao de integridade e sintaxe pre-deploy
+    ├── security_guard.py     # Auditoria de privacidade e seguranca (anti-leaks)
+    ├── install_git_hooks.py  # Ativa githooks pre-commit e pre-push
     └── install_daemon.py     # Transfere e ativa o daemon na TV
 ```
 
@@ -38,7 +42,19 @@ Edite o `.env` com:
 - `TV_IP`: Endereço IP da TV na rede Wi-Fi/Ethernet.
 - `HOST_DEPLOY_IP`: Endereço IP da sua máquina de desenvolvimento.
 
-### 2. Compilar o Launcher
+### 2. Ativar Proteção de Privacidade e Git Hooks
+Para garantir que nenhuma credencial ou IP real seja enviado ao GitHub ao tornar o repositório público:
+```bash
+python tools/install_git_hooks.py
+```
+Esse comando ativa os hooks em `.githooks/` (`pre-push` e `pre-commit`). Todo `git push` executará automaticamente o `tools/security_guard.py`.
+
+### 3. Executar Auditoria de Segurança Manualmente
+```bash
+python tools/security_guard.py
+```
+
+### 4. Compilar o Launcher
 O script `webos/build.py` utiliza Python puro para gerar o `.ipk` (sem precisar instalar o LG webOS CLI):
 ```bash
 cd free-my-tv
@@ -46,14 +62,14 @@ python webos/build.py
 ```
 Isso gera o arquivo `FreeMyTV-webos.ipk`.
 
-### 3. Fazer Deploy na TV
+### 5. Fazer Deploy na TV
 Na raiz do projeto, execute:
 ```bash
 python tools/deploy_to_tv.py
 ```
-Esse comando inicia um servidor HTTP temporário na máquina de desenvolvimento, faz a TV baixar o `.ipk` via `curl` e aciona o serviço nativo `luna://com.webos.appInstallService/dev/install`.
+Esse comando executa a validação pré-deploy (`verify_build.py`), inicia um servidor HTTP temporário na máquina de desenvolvimento, faz a TV baixar o `.ipk` via `curl` e aciona o serviço nativo `luna://com.webos.appInstallService/dev/install`.
 
-### 4. Instalar ou Atualizar o Daemon de Boot / Home Intercept
+### 6. Instalar ou Atualizar o Daemon de Boot / Home Intercept
 O daemon gerencia a interceptação do botão Home e o app de inicialização rápida:
 ```bash
 python tools/install_daemon.py
@@ -61,6 +77,6 @@ python tools/install_daemon.py
 
 ---
 
-## 🛡️ Regras de Segurança
-- **Nunca comite arquivos `.env`, chaves SSH (`*.pem`, `id_rsa`) ou o arquivo `config.properties` contendo tokens pessoais.**
-- O arquivo `.gitignore` já está pré-configurado para bloquear binários `.ipk`, segredos e logs locais.
+## 🛡️ Regras de Segurança e Repositório Público
+- **Zero Vazamento de Dados Pessoais**: `.env`, chaves SSH/Telnet (`*.pem`, `id_rsa`), backups de contingência (`backup_local/`) e arquivos com tokens (`config.properties`) são estritamente ignorados pelo `.gitignore` e bloqueados pelo `security_guard.py`.
+- **Pre-Push Guard**: Qualquer tentativa de `git push` com IPs locais reais, MACs de hardware, chaves privadas ou caminhos de diretorio de usuario local e imediatamente abortada pelo hook.

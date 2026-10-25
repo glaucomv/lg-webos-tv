@@ -11,5 +11,6 @@
   "resolution": "1920x1080",
   "handlesRelaunch": true,
   "disableBackHistoryAPI": true,
+  "transparent": true,
   "requiredPermissions": ["applications", "applications.launcher"]
 }

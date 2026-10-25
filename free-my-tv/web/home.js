@@ -407,6 +407,8 @@
     };
   }
 
+  var currentLiveVideoApp = null;
+
   function updateSpotlight() {
     var spot = $('spotlight');
     if (!spot || !shelf.length) return;
@@ -418,6 +420,38 @@
     if (t) t.textContent = meta.title;
     if (desc) desc.textContent = meta.tagline;
     if (hint) hint.innerHTML = '<span class="hint-badge">OK</span> ' + meta.hint;
+
+    var previewBox = $('spot-preview-box');
+    var isLiveTV = (app.id === 'com.webos.app.livetv');
+    if (previewBox) {
+      setClass(previewBox, 'preview-hidden', !isLiveTV);
+    }
+
+    var vid = $('tv-live-preview');
+    if (isLiveTV) {
+      if (vid && currentLiveVideoApp !== app.id) {
+        currentLiveVideoApp = app.id;
+        while (vid.firstChild) vid.removeChild(vid.firstChild);
+        var src = document.createElement('source');
+        src.src = 'tv://';
+        src.type = 'service/webos-broadcast';
+        vid.appendChild(src);
+        vid.muted = true;
+        vid.load();
+        var p = vid.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    } else {
+      if (vid && currentLiveVideoApp) {
+        currentLiveVideoApp = null;
+        try {
+          vid.pause();
+          while (vid.firstChild) vid.removeChild(vid.firstChild);
+          vid.removeAttribute('src');
+          vid.load();
+        } catch (e) {}
+      }
+    }
   }
 
   function updateFocus() {
@@ -560,6 +594,46 @@
       bgFront = next;
     };
     img.src = url;
+  }
+
+  // MARK: - Custom Wallpaper & Photo Slideshow
+
+  var WALLPAPERS = [
+    'wallpapers/aurora.jpg',
+    'wallpapers/sunset.jpg'
+  ];
+  var currentWallIdx = 0;
+  var wallFront = 'wallA';
+  var wallTimer = null;
+
+  function setWallpaper(url) {
+    if (!url) return;
+    var next = (wallFront === 'wallA') ? 'wallB' : 'wallA';
+    var nextEl = $(next), frontEl = $(wallFront);
+    if (!nextEl || !frontEl) return;
+
+    var img = new Image();
+    img.onload = function () {
+      nextEl.style.backgroundImage = 'url("' + url + '")';
+      setClass(nextEl, 'on', true);
+      setClass(frontEl, 'on', false);
+      wallFront = next;
+    };
+    img.src = url;
+  }
+
+  function nextWallpaper() {
+    if (!WALLPAPERS || !WALLPAPERS.length) return;
+    currentWallIdx = (currentWallIdx + 1) % WALLPAPERS.length;
+    setWallpaper(WALLPAPERS[currentWallIdx]);
+  }
+
+  function initWallpaper() {
+    if (WALLPAPERS && WALLPAPERS.length) {
+      setWallpaper(WALLPAPERS[0]);
+      if (wallTimer) clearInterval(wallTimer);
+      wallTimer = setInterval(nextWallpaper, 60000);
+    }
   }
 
   function renderClock() {
@@ -1405,7 +1479,12 @@
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { hideSaver(); return; }
+    if (document.hidden) {
+      hideSaver();
+      var vid = $('tv-live-preview');
+      if (vid) { try { vid.pause(); } catch (e) {} }
+      return;
+    }
     idleAt = Date.now();
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
@@ -1417,6 +1496,7 @@
   fit();
   renderTop();
   tickClock();
+  initWallpaper();
   loadApps(function () {
     renderAll();
     Data.refresh();
