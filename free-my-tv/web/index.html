@@ -49,18 +49,19 @@
           <p id="spot-desc"></p>
           <div id="spot-hint"></div>
         </div>
-        <div id="spot-preview-box" class="preview-hidden">
+        <div id="spot-preview-box">
           <div class="preview-frame">
             <video id="tv-live-preview" autoplay muted playsinline></video>
-            <div class="preview-badge"><span class="preview-pulse"></span>AO VIVO</div>
+            <div id="app-preview-img"></div>
+            <div class="preview-badge"><span id="preview-pulse-dot" class="preview-pulse"></span><span id="preview-badge-text">AO VIVO</span></div>
             <div class="preview-bar">
               <span class="preview-title" id="preview-channel-name">Sintonizador TV Aberta</span>
-              <span class="preview-sub">Pressione OK para tela cheia</span>
+              <span class="preview-sub" id="preview-sub-text">Pressione OK para tela cheia</span>
             </div>
           </div>
         </div>
       </div>
-      <div id="cards"></div>
+      <div id="cards" style="display:none"></div>
     </div>
     <div id="platter"></div>
     <div id="tiles"></div>

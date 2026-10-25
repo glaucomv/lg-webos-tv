@@ -222,9 +222,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .round.focus { background: #FFF; color: #1D1D1F; }
 .night .round.focus .tip { color: #F5F5F7; }
 
-/* MARK: - Picks: a wide card and two tall ones; focused, a card grows 5%, rises and its edge lights up. */
+/* MARK: - Picks: disabled in favor of unified Spotlight Hero */
+#cards { display: none !important; }
 
 .card {
+  display: none !important;
   position: absolute;
   top: 262px;
   height: 442px;
@@ -411,17 +413,32 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   height: 100%;
   border-radius: 20px;
   overflow: hidden;
-  background: #000;
+  background: transparent !important;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 122, 255, 0.25);
 }
 
 #tv-live-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  background: #000;
+  background: transparent !important;
+}
+
+#app-preview-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  border-radius: 20px;
+  display: none;
 }
 
 .preview-badge {
@@ -441,6 +458,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+  -webkit-transition: background 0.3s ease;
+  transition: background 0.3s ease;
 }
 
 .preview-pulse {
@@ -451,6 +470,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background: #FFF;
   margin-right: 6px;
   animation: pulse 1.5s infinite;
+}
+
+.preview-pulse.pulse-hidden {
+  display: none !important;
 }
 
 @keyframes pulse {

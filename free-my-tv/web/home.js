@@ -335,61 +335,90 @@
       title: 'TV Aberta',
       tagline: 'Sinal digital e canais abertos ao vivo na sua TV',
       badge: 'AO VIVO',
-      hint: 'Pressione OK para sintonizar a TV'
+      hint: 'Pressione OK para sintonizar a TV',
+      channelName: 'Sintonizador TV Aberta',
+      subText: 'Sinal Digital HD · Pressione OK para tela cheia'
     },
     'youtube': {
       title: 'YouTube',
-      tagline: 'Vídeos, canais inscritos e transmissões em alta',
-      badge: 'STREAMING',
-      hint: 'Pressione OK para abrir o YouTube'
+      tagline: 'Vídeos em alta, canais inscritos e recomendações personalizadas',
+      badge: 'EM ALTA',
+      hint: 'Pressione OK para abrir o YouTube',
+      preview: 'wallpapers/preview_youtube.jpg',
+      channelName: 'YouTube Brasil',
+      subText: 'Destaques e vídeos mais assistidos'
     },
     'netflix': {
       title: 'Netflix',
-      tagline: 'Filmes, séries aclamadas e originais exclusivos',
-      badge: 'STREAMING',
-      hint: 'Pressione OK para abrir a Netflix'
+      tagline: 'Filmes aclamados, séries globais e originais exclusivos',
+      badge: 'TOP 10',
+      hint: 'Pressione OK para abrir a Netflix',
+      preview: 'wallpapers/preview_netflix.jpg',
+      channelName: 'Netflix Brasil',
+      subText: 'The Aeon\'s Edge · Lançamento em Alta'
     },
     'prime': {
       title: 'Prime Video',
       tagline: 'Filmes, séries e produções Amazon Originals',
       badge: 'STREAMING',
-      hint: 'Pressione OK para abrir o Prime Video'
+      hint: 'Pressione OK para abrir o Prime Video',
+      preview: 'wallpapers/sunset.jpg',
+      channelName: 'Prime Video Brasil',
+      subText: 'Filmes e Séries Exclusivas'
     },
     'globoplay': {
       title: 'Globoplay',
-      tagline: 'Novelas, séries, jornalismo e canais ao vivo',
-      badge: 'STREAMING',
-      hint: 'Pressione OK para abrir o Globoplay'
+      tagline: 'Novelas consagradas, séries originais e jornalismo ao vivo',
+      badge: 'DESTAQUES',
+      hint: 'Pressione OK para abrir o Globoplay',
+      preview: 'wallpapers/preview_globoplay.jpg',
+      channelName: 'Globoplay Originais',
+      subText: 'Marés do Crime · Nova Série Original'
     },
     'max': {
       title: 'Max',
       tagline: 'HBO, Warner Bros, Max Originals e Universo DC',
       badge: 'STREAMING',
-      hint: 'Pressione OK para abrir o Max'
+      hint: 'Pressione OK para abrir o Max',
+      preview: 'wallpapers/aurora.jpg',
+      channelName: 'Max Originals',
+      subText: 'Filmes e séries HBO'
     },
     'disney': {
       title: 'Disney+',
       tagline: 'Disney, Pixar, Marvel, Star Wars e National Geographic',
       badge: 'STREAMING',
-      hint: 'Pressione OK para abrir o Disney+'
+      hint: 'Pressione OK para abrir o Disney+',
+      preview: 'wallpapers/aurora.jpg',
+      channelName: 'Disney+ Destaques',
+      subText: 'Universo Marvel & Star Wars'
     },
     'spotify': {
       title: 'Spotify',
-      tagline: 'Músicas, playlists recomendadas e podcasts',
-      badge: 'MÚSICA',
-      hint: 'Pressione OK para abrir o Spotify'
+      tagline: 'Músicas, playlists recomendadas e podcasts sem parar',
+      badge: 'PLAYLISTS',
+      hint: 'Pressione OK para abrir o Spotify',
+      preview: 'wallpapers/preview_spotify.jpg',
+      channelName: 'Spotify · Neon Rhythms',
+      subText: 'Ultra HD Audio · Top 50 Brasil'
     },
     'jellyfin': {
       title: 'Jellyfin',
       tagline: 'Sua central de mídia local e streaming particular',
       badge: 'MÍDIA LOCAL',
-      hint: 'Pressione OK para conectar'
+      hint: 'Pressione OK para conectar',
+      preview: 'wallpapers/photo_praia.jpg',
+      channelName: 'Jellyfin Media Server',
+      subText: 'Biblioteca de Filmes & Mídia Pessoal'
     },
     'browser': {
       title: 'Navegador Web',
       tagline: 'Navegue na web em tela cheia na sua TV',
       badge: 'NAVEGADOR',
-      hint: 'Pressione OK para abrir'
+      hint: 'Pressione OK para abrir',
+      preview: 'wallpapers/aurora.jpg',
+      channelName: 'Navegador webOS',
+      subText: 'Pressione OK para navegar'
     }
   };
 
@@ -403,7 +432,10 @@
       title: app.title || 'Aplicativo',
       tagline: 'Aplicativo instalado na sua Smart TV',
       badge: 'APP',
-      hint: 'Pressione OK para abrir'
+      hint: 'Pressione OK para abrir',
+      preview: 'wallpapers/aurora.jpg',
+      channelName: app.title || 'Aplicativo',
+      subText: 'Pressione OK para iniciar'
     };
   }
 
@@ -422,34 +454,72 @@
     if (hint) hint.innerHTML = '<span class="hint-badge">OK</span> ' + meta.hint;
 
     var previewBox = $('spot-preview-box');
-    var isLiveTV = (app.id === 'com.webos.app.livetv');
     if (previewBox) {
-      setClass(previewBox, 'preview-hidden', !isLiveTV);
+      setClass(previewBox, 'preview-hidden', false);
     }
 
+    var isLiveTV = (app.id === 'com.webos.app.livetv');
     var vid = $('tv-live-preview');
+    var appImg = $('app-preview-img');
+    var pulseDot = $('preview-pulse-dot');
+    var badgeText = $('preview-badge-text');
+    var pBadge = previewBox ? previewBox.querySelector('.preview-badge') : null;
+    var chName = $('preview-channel-name');
+    var subText = $('preview-sub-text');
+
+    if (chName) chName.textContent = meta.channelName || meta.title;
+    if (subText) subText.textContent = meta.subText || meta.hint;
+
     if (isLiveTV) {
-      if (vid && currentLiveVideoApp !== app.id) {
-        currentLiveVideoApp = app.id;
-        while (vid.firstChild) vid.removeChild(vid.firstChild);
-        var src = document.createElement('source');
-        src.src = 'tv://';
-        src.type = 'service/webos-broadcast';
-        vid.appendChild(src);
-        vid.muted = true;
-        vid.load();
-        var p = vid.play();
-        if (p && p.catch) p.catch(function () {});
+      if (appImg) appImg.style.display = 'none';
+      if (pulseDot) setClass(pulseDot, 'pulse-hidden', false);
+      if (badgeText) badgeText.textContent = 'AO VIVO';
+      if (pBadge) pBadge.style.background = 'rgba(220, 38, 38, 0.9)';
+
+      if (vid) {
+        vid.style.display = 'block';
+        if (currentLiveVideoApp !== app.id) {
+          currentLiveVideoApp = app.id;
+          while (vid.firstChild) vid.removeChild(vid.firstChild);
+          var src = document.createElement('source');
+          src.src = 'tv://';
+          src.type = 'service/webos-broadcast';
+          vid.appendChild(src);
+          vid.muted = true;
+          vid.load();
+          var p = vid.play();
+          if (p && p.catch) p.catch(function () {});
+        }
       }
     } else {
-      if (vid && currentLiveVideoApp) {
-        currentLiveVideoApp = null;
-        try {
-          vid.pause();
-          while (vid.firstChild) vid.removeChild(vid.firstChild);
-          vid.removeAttribute('src');
-          vid.load();
-        } catch (e) {}
+      if (vid) {
+        if (currentLiveVideoApp) {
+          currentLiveVideoApp = null;
+          try {
+            vid.pause();
+            while (vid.firstChild) vid.removeChild(vid.firstChild);
+            vid.removeAttribute('src');
+            vid.load();
+          } catch (e) {}
+        }
+        vid.style.display = 'none';
+      }
+
+      if (pulseDot) setClass(pulseDot, 'pulse-hidden', true);
+      if (badgeText) badgeText.textContent = meta.badge || 'STREAMING';
+      if (pBadge) {
+        if (meta.badge === 'MÚSICA' || meta.badge === 'PLAYLISTS') {
+          pBadge.style.background = 'rgba(16, 185, 129, 0.9)';
+        } else if (meta.badge === 'EM ALTA') {
+          pBadge.style.background = 'rgba(239, 68, 68, 0.9)';
+        } else {
+          pBadge.style.background = 'rgba(0, 122, 255, 0.88)';
+        }
+      }
+
+      if (appImg) {
+        appImg.style.display = 'block';
+        appImg.style.backgroundImage = 'url("' + (meta.preview || 'wallpapers/aurora.jpg') + '")';
       }
     }
   }
@@ -552,28 +622,11 @@
   // MARK: - Picks and background
 
   function renderCards() {
-    var list = Data.picks(TAB_KIND[st.tab]);
+    cards = [];
     var holder = $('cards');
-    setClass(body, 'no-picks', !list.length);
-    var same = list.length === cards.length;
-    for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop && list[i].meta === cards[i].meta;
-    if (same && holder.children.length === list.length) return;
-    cards = list;
-    holder.innerHTML = '';
-    var rects = [[80, 1040], [1160, 320], [1520, 320]];
-    for (var c = 0; c < list.length; c++) {
-      var p = list[c], card = el('div', 'card', holder);
-      card.style.left = rects[c][0] + 'px';
-      card.style.width = rects[c][1] + 'px';
-      var img = el('div', 'img', card);
-      img.style.backgroundImage = 'url(' + Data.image(p.backdrop, c === 0 ? 'w1280' : 'w500') + ')';
-      el('div', 'name', card, p.title);
-      if (c === 0 && p.meta) el('div', 'meta', card, p.meta);
-      hover(card, Z.CARDS, c);
-    }
-    st.card = Math.min(st.card, Math.max(0, list.length - 1));
-    if (!list.length && st.zone === Z.CARDS) st.zone = Z.SHELF;
-    backdrop(list.length ? Data.image(list[0].backdrop, 'w300') : '');
+    if (holder) holder.innerHTML = '';
+    setClass(body, 'no-picks', true);
+    if (st.zone === Z.CARDS) st.zone = Z.SHELF;
     updateFocus();
   }
 
@@ -670,6 +723,27 @@
     setWallpaper(list[currentWallIdx].url);
   }
 
+  function loadPersonalManifest() {
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'wallpapers/personal_manifest.json?t=' + Date.now(), true);
+      xhr.timeout = 3000;
+      xhr.onload = function () {
+        if (xhr.status === 200 || xhr.status === 0) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (Array.isArray(data) && data.length > 0) {
+              WALLPAPER_CATALOG.personal = data;
+              var list = getActiveWallpapers();
+              if (list && list.length) setWallpaper(list[0].url);
+            }
+          } catch (e) {}
+        }
+      };
+      xhr.send();
+    } catch (e) {}
+  }
+
   function initWallpaper() {
     var list = getActiveWallpapers();
     if (list && list.length) {
@@ -677,6 +751,7 @@
       if (wallTimer) clearInterval(wallTimer);
       wallTimer = setInterval(nextWallpaper, 60000);
     }
+    loadPersonalManifest();
   }
 
   // MARK: - Audio Output Quick Selector

@@ -36,13 +36,30 @@ def deploy():
     dl_res = telnet_cmd(f"curl -s -f -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk", timeout=10)
     print("TV download result:", dl_res)
 
+    print("Closing running instance if any...")
+    telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/close '{\"id\":\"io.freemytv\"}'")
+    time.sleep(1)
+
     print("Installing on TV via Luna appInstallService...")
     inst_res = telnet_cmd("luna-send -n 1 luna://com.webos.appInstallService/dev/install '{\"id\":\"io.freemytv\",\"ipkUrl\":\"/tmp/freemytv.ipk\",\"subscribe\":false}'", timeout=15)
     print("TV install result:", inst_res)
 
-    print("Launching Free My TV...")
-    launch_res = telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"io.freemytv\"}'")
-    print("TV launch result:", launch_res)
+    daemon_src = os.path.join(ROOT_DIR, "daemon", "15-sync-usb-photos.sh")
+    if os.path.exists(daemon_src):
+        with open(daemon_src, "r", encoding="utf-8") as f:
+            d_content = f.read()
+        telnet_cmd("mkdir -p /media/developer/apps/usr/palm/applications/io.freemytv/daemon")
+        telnet_cmd(f"cat << 'EOF' > /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh\n{d_content}\nEOF\nchmod +x /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh")
+        telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true")
+
+    print("Waiting for webOS package extraction lock to release and launching Free My TV...")
+    for attempt in range(1, 6):
+        time.sleep(2)
+        launch_res = telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"io.freemytv\"}'")
+        if '"returnValue":true' in launch_res or 'app is locked' not in launch_res:
+            print(f"TV launch result (attempt {attempt}):", launch_res)
+            break
+        print(f"  App still unlocking (attempt {attempt})...")
 
     server.shutdown()
     print("Deployment finished successfully!")

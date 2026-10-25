@@ -75,6 +75,32 @@ O daemon gerencia a interceptação do botão Home e o app de inicialização r�
 python tools/install_daemon.py
 ```
 
+### 7. Fotos Pessoais via Pendrive e Google Fotos
+
+#### A. Usar Fotos Pessoais do Pendrive Conectado à TV
+1. Crie uma pasta chamada `fotos` (ou `wallpapers`) na raiz do seu pendrive.
+2. Copie suas fotos (`.jpg`, `.jpeg`, `.png`) para dentro dessa pasta.
+3. Conecte o pendrive em qualquer porta USB da TV.
+4. O script `daemon/15-sync-usb-photos.sh` descobre automaticamente os arquivos no pendrive montado (`/tmp/usb/*/*` ou `/media/multimedia/*`) e atualiza o manifesto `personal_manifest.json`.
+5. No Launcher, vá em **Configurações > Imagens de Fundo** e selecione **Opção A: Fotos Pessoais** ou **Todas**.
+
+#### B. Sincronizar Fotos Automaticamente do Google Fotos
+Para manter novas fotos da família ou viagens sempre atualizadas:
+1. No **Google Fotos**, selecione as fotos e crie um **Álbum Compartilhado** (ex: "Fotos TV").
+2. Clique em **Compartilhar > Criar Link** e copie a URL (ex: `https://photos.app.goo.gl/EXEMPLO`).
+3. Baixe diretamente para o pendrive ou envie para a TV:
+   ```bash
+   # Baixar para o pendrive conectado no computador (ex: E:\fotos):
+   python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --dest "E:\fotos"
+
+   # Ou enviar diretamente para a TV via Wi-Fi (sem tirar o pendrive da TV):
+   python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --tv
+   ```
+4. Para agendar a atualização automática no Windows (diariamente):
+   ```powershell
+   .\tools\schedule_photo_sync.ps1 -AlbumUrl "https://photos.app.goo.gl/EXEMPLO" -SendToTv
+   ```
+
 ---
 
 ## 🛡️ Regras de Segurança e Repositório Público
