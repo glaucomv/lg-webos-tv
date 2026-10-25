@@ -524,10 +524,15 @@
     }
     var buttons = $('buttons');
     buttons.innerHTML = '';
-    var defs = [['live_tv', tr('light|Live TV')], ['hdmi', tr('HDMI Inputs')], ['settings', tr('light|Settings')]];
-    for (var b = 0; b < 3; b++) {
-      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
-      r.style.left = (1596 + 88 * b) + 'px';
+    var defs = [
+      ['live_tv', tr('light|Live TV')],
+      ['hdmi', tr('HDMI Inputs')],
+      ['speaker', 'Áudio: ' + audioOutputName(currentAudioMode)],
+      ['settings', tr('light|Settings')]
+    ];
+    for (var b = 0; b < 4; b++) {
+      var r = el('button', 'round' + (b === 3 ? ' last' : ''), buttons);
+      r.style.left = (1508 + 88 * b) + 'px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
       hover(r, Z.TOP, 3 + b);
@@ -598,10 +603,46 @@
 
   // MARK: - Custom Wallpaper & Photo Slideshow
 
-  var WALLPAPERS = [
-    'wallpapers/aurora.jpg',
-    'wallpapers/sunset.jpg'
-  ];
+  // MARK: - Custom Wallpaper & Photo Slideshow
+
+  var WALLPAPER_CATALOG = {
+    personal: [
+      {url: 'wallpapers/photo_praia.jpg', title: 'Férias na Praia (Fotos Pessoais)'},
+      {url: 'wallpapers/photo_montanha.jpg', title: 'Piquenique na Montanha (Fotos Pessoais)'}
+    ],
+    curated: [
+      {url: 'wallpapers/aurora.jpg', title: 'Aurora Boreal Nórdica (OLED 4K)'},
+      {url: 'wallpapers/sunset.jpg', title: 'Pôr do Sol Dourado (OLED 4K)'}
+    ]
+  };
+
+  function getActiveWallpapers() {
+    var mode = Prefs.wallpaperMode();
+    if (mode === 'personal') return WALLPAPER_CATALOG.personal;
+    if (mode === 'curated') return WALLPAPER_CATALOG.curated;
+    return WALLPAPER_CATALOG.curated.concat(WALLPAPER_CATALOG.personal);
+  }
+
+  function wallpaperModeLabel() {
+    var m = Prefs.wallpaperMode();
+    if (m === 'personal') return 'Opção A: Fotos Pessoais';
+    if (m === 'curated') return 'Opção C: OLED Wallpapers';
+    return 'Todas (Fotos & OLED)';
+  }
+
+  function cycleWallpaperMode(d) {
+    var modes = ['all', 'personal', 'curated'];
+    var cur = Prefs.wallpaperMode();
+    var idx = modes.indexOf(cur);
+    var next = modes[(idx + (d || 1) + modes.length) % modes.length];
+    Prefs.set('wallpaperMode', next);
+    currentWallIdx = 0;
+    var list = getActiveWallpapers();
+    if (list.length) setWallpaper(list[0].url);
+    toast(wallpaperModeLabel());
+    if (st.zone === Z.SETTINGS) renderSettings();
+  }
+
   var currentWallIdx = 0;
   var wallFront = 'wallA';
   var wallTimer = null;
@@ -623,17 +664,96 @@
   }
 
   function nextWallpaper() {
-    if (!WALLPAPERS || !WALLPAPERS.length) return;
-    currentWallIdx = (currentWallIdx + 1) % WALLPAPERS.length;
-    setWallpaper(WALLPAPERS[currentWallIdx]);
+    var list = getActiveWallpapers();
+    if (!list || !list.length) return;
+    currentWallIdx = (currentWallIdx + 1) % list.length;
+    setWallpaper(list[currentWallIdx].url);
   }
 
   function initWallpaper() {
-    if (WALLPAPERS && WALLPAPERS.length) {
-      setWallpaper(WALLPAPERS[0]);
+    var list = getActiveWallpapers();
+    if (list && list.length) {
+      setWallpaper(list[0].url);
       if (wallTimer) clearInterval(wallTimer);
       wallTimer = setInterval(nextWallpaper, 60000);
     }
+  }
+
+  // MARK: - Audio Output Quick Selector
+
+  var AUDIO_OUTPUTS = [
+    {id: 'external_optical', name: 'Saída Óptica'},
+    {id: 'tv_speaker', name: 'Alto-falante da TV'},
+    {id: 'external_arc', name: 'HDMI (ARC)'},
+    {id: 'tv_external_speaker', name: 'TV + Saída Óptica'},
+    {id: 'bt_soundbar', name: 'Bluetooth / Soundbar'},
+    {id: 'headphone', name: 'Fones de Ouvido'}
+  ];
+  var currentAudioMode = 'external_optical';
+
+  function initAudioOutput() {
+    TV.getSoundOutput(function (mode) {
+      if (mode) currentAudioMode = mode;
+      updateAudioTip();
+      if (st.zone === Z.SETTINGS) renderSettings();
+    });
+  }
+
+  function audioOutputName(id) {
+    for (var i = 0; i < AUDIO_OUTPUTS.length; i++) {
+      if (AUDIO_OUTPUTS[i].id === id) return AUDIO_OUTPUTS[i].name;
+    }
+    return id || 'Automático';
+  }
+
+  function updateAudioTip() {
+    var btn = $('buttons');
+    if (!btn || btn.children.length < 4) return;
+    var audioBtn = btn.children[2];
+    var tip = audioBtn.querySelector('.tip');
+    if (tip) tip.textContent = 'Áudio: ' + audioOutputName(currentAudioMode);
+  }
+
+  function cycleAudioOutput(d) {
+    var idx = 0;
+    for (var i = 0; i < AUDIO_OUTPUTS.length; i++) {
+      if (AUDIO_OUTPUTS[i].id === currentAudioMode) { idx = i; break; }
+    }
+    var nextIdx = (idx + (d || 1) + AUDIO_OUTPUTS.length) % AUDIO_OUTPUTS.length;
+    var target = AUDIO_OUTPUTS[nextIdx];
+    TV.setSoundOutput(target.id, function (ok) {
+      if (ok) {
+        currentAudioMode = target.id;
+        Prefs.set('soundOutput', target.id);
+        updateAudioTip();
+        toast('Saída de áudio: ' + target.name);
+        if (st.zone === Z.SETTINGS) renderSettings();
+      } else {
+        toast('Falha ao alternar saída de áudio');
+      }
+    });
+  }
+
+  // MARK: - Weather Pill Badge
+
+  function updateWeatherBadge() {
+    var wb = $('weather-badge');
+    if (!wb) return;
+    if (!Prefs.weather() || !Data.weather) {
+      wb.style.display = 'none';
+      return;
+    }
+    wb.style.display = 'flex';
+    var w = Data.weather;
+    var iconEl = wb.querySelector('.wx-icon');
+    if (iconEl) {
+      iconEl.className = 'wx-icon sym';
+      sym(Data.symbol(w.code, w.isDay), iconEl);
+    }
+    var tempEl = wb.querySelector('.wx-temp');
+    if (tempEl) tempEl.textContent = Data.degrees(w.temp);
+    var cityEl = wb.querySelector('.wx-city');
+    if (cityEl) cityEl.textContent = Data.city || 'São Paulo';
   }
 
   function renderClock() {
@@ -879,12 +999,21 @@
         step: function (d) { if (d >= 0) openLanguages(); }},
       {label: tr('Power On App') || 'Ao ligar a TV', value: powerOnAppLabel(), opens: true, poweron: true,
         step: function (d) { if (d >= 0) openPowerOnPicker(); }},
+      {label: 'Plano de Fundo e Descanso', value: wallpaperModeLabel(), opens: true, wallpaper: true,
+        step: function (d) { cycleWallpaperMode(d); }},
+      {label: 'Saída de Áudio', value: audioOutputName(currentAudioMode), opens: true, audio: true,
+        step: function (d) { cycleAudioOutput(d); }},
       {label: tr('Temperature'), value: unit === 'C' ? '°C' : unit === 'F' ? '°F' : tr('unit|Automatic'),
         step: function (d) { cycle('temperature', ['auto', 'C', 'F'], unit, d); renderPanels(); }},
       {label: tr('Theme'), value: theme === 'light' ? tr('Light') : theme === 'dark' ? tr('Dark') : auto,
         step: function (d) { cycle('theme', ['auto', 'light', 'dark'], theme, d); checkNight(); }},
-      {label: tr('Weather widget'), toggle: Prefs.weather(),
-        step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); }},
+      {label: tr('Weather widget') || 'Previsão do Tempo', toggle: Prefs.weather(),
+        step: function () {
+          Prefs.set('weather', !Prefs.weather());
+          if (Prefs.weather()) { Data.refreshWeather(true); }
+          updateWeatherBadge();
+          renderPanels();
+        }},
       {label: tr('Quotes widget'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
@@ -1187,6 +1316,7 @@
         if (st.top < 3) return;
         if (st.top === 3) { var live = liveTV(); if (live) launcher(live.id, tr('Live TV'))(); }
         else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
+        else if (st.top === 5) { cycleAudioOutput(); }
         else openSettings();
         return;
       case Z.CARDS:
@@ -1242,7 +1372,7 @@
       case Z.TOP:
         if (dx) {
           var minTop = cards.length ? 0 : 3;
-          st.top = Math.max(minTop, Math.min(5, st.top + dx));
+          st.top = Math.max(minTop, Math.min(6, st.top + dx));
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
@@ -1351,7 +1481,7 @@
   }
 
   function showSaver() {
-    var photos = saverPhotos();
+    var list = getActiveWallpapers();
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
@@ -1364,11 +1494,11 @@
     var front = a;
     function next() {
       if (!saverOn) return;
-      var p = photos.length ? photos[saverIndex++ % photos.length] : null;
+      var p = (list && list.length) ? list[saverIndex++ % list.length] : null;
       var back = front === a ? b : a;
       if (p) {
-        back.style.backgroundImage = 'url(' + Data.image(p.backdrop, 'w1280') + ')';
-        clock.lastChild.textContent = p.title;
+        back.style.backgroundImage = 'url("' + p.url + '")';
+        clock.lastChild.textContent = p.title || '';
         setTimeout(function () {
           setClass(back, 'on', true);
           setClass(front, 'on', false);
@@ -1376,7 +1506,7 @@
         }, 60);
       }
       tickSaverClock(clock);
-      saverTimer = setTimeout(next, 12000);
+      saverTimer = setTimeout(next, 10000);
     }
     setClass(s, 'on', true);
     next();
@@ -1492,13 +1622,16 @@
   I18N.set(Prefs.language());
   checkNight();   // now, from the last forecast: not after the TV lists its apps, with the day look until then
   // LG's screensaver waits only when ours will show: not under a sheet (ours waits there), and not without photos.
-  TV.holdScreenSaver(function () { return !sheetOpen() && saverPhotos().length > 0; });
+  TV.holdScreenSaver(function () { return !sheetOpen() && getActiveWallpapers().length > 0; });
   fit();
   renderTop();
   tickClock();
   initWallpaper();
+  initAudioOutput();
+  updateWeatherBadge();
   loadApps(function () {
     renderAll();
+    updateWeatherBadge();
     Data.refresh();
   });
   setInterval(function () {

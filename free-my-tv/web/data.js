@@ -21,12 +21,14 @@ var Place = (function () {
     return {country: p[0], lat: p[1], lon: p[2], name: p[3] || name.slice(name.lastIndexOf('/') + 1).replace(/_/g, ' ')};
   }
 
-  var tz = zone(TV.zone()), set = CONFIG.latitude !== '' && CONFIG.latitude !== undefined;
-  var country = (CONFIG.tmdbRegion || (tz ? tz.country : '') || 'US').toUpperCase();
+  var tz = zone(TV.zone());
+  var isDefaultNY = (CONFIG.latitude === '40.7128' && CONFIG.longitude === '-74.0060');
+  var set = !isDefaultNY && CONFIG.latitude !== '' && CONFIG.latitude !== undefined;
+  var country = (CONFIG.tmdbRegion || (tz ? tz.country : '') || 'BR').toUpperCase();
   return {
-    lat: set ? CONFIG.latitude : tz ? tz.lat : '40.7128',
-    lon: set ? CONFIG.longitude : tz ? tz.lon : '-74.0060',
-    city: CONFIG.city || (!set && tz ? tz.name : ''),
+    lat: set ? CONFIG.latitude : tz ? tz.lat : '-23.53',
+    lon: set ? CONFIG.longitude : tz ? tz.lon : '-46.62',
+    city: CONFIG.city || (!set && tz ? tz.name : 'São Paulo'),
     country: country,
     currency: (CONFIG.currency || (country === 'BR' ? 'BRL' : EURO.test(country) ? 'EUR' : 'USD')).toUpperCase(),
     /** Fahrenheit for TVs in the US (by their time zone, or their language when it doesn't tell). */
@@ -47,6 +49,8 @@ var Prefs = (function () {
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', false); },
+    wallpaperMode: function () { return pick('wallpaperMode', 'all'); },
+    soundOutput: function () { return pick('soundOutput', 'external_optical'); },
     quotes: function () { return pick('quotes', false); },
     powerOnApp: function () { return pick('powerOnApp', 'com.webos.app.livetv'); },
     shelf: function () { return pick('shelf', null); },
@@ -284,10 +288,59 @@ var Data = (function () {
     return (cut > 0 ? t.slice(0, cut) : t).replace(/^\s+|\s+$/g, '');
   }
 
+  var REGIONAL_PICKS_BR = [
+    {
+      id: 'reg_live_tv',
+      kind: 'tv',
+      title: 'Sintonizador TV Aberta',
+      meta: 'Sinal Digital HD · TV Aberta',
+      app: 'com.webos.app.livetv',
+      service: 'TV Aberta',
+      backdrop: 'wallpapers/aurora.jpg',
+      detailed: true
+    },
+    {
+      id: 'reg_yt_tendencias',
+      kind: 'movie',
+      title: 'YouTube em Alta',
+      meta: 'Vídeos Mais Vistos · YouTube',
+      app: 'youtube',
+      service: 'YouTube',
+      backdrop: 'wallpapers/sunset.jpg',
+      detailed: true
+    },
+    {
+      id: 'reg_globo_destaque',
+      kind: 'tv',
+      title: 'Globoplay Destaques',
+      meta: 'Novelas & Séries · Globoplay',
+      app: 'globoplay',
+      service: 'Globoplay',
+      backdrop: 'wallpapers/photo_montanha.jpg',
+      detailed: true
+    },
+    {
+      id: 'reg_netflix_top',
+      kind: 'movie',
+      title: 'Top 10 Brasil na Netflix',
+      meta: 'Filmes em Alta · Netflix',
+      app: 'netflix',
+      service: 'Netflix',
+      backdrop: 'wallpapers/photo_praia.jpg',
+      detailed: true
+    }
+  ];
+
   /** This hour's 3 picks: movies ("movie"), shows ("tv") or both (null). */
   function now(kind) {
     var list = [];
-    if (!KEY) return list;
+    if (!KEY) {
+      for (var r = 0; r < REGIONAL_PICKS_BR.length; r++) {
+        var it = REGIONAL_PICKS_BR[r];
+        if (kind === null || kind === it.kind) list.push(it);
+      }
+      return list.slice(0, 3);
+    }
     for (var i = 0; i < picks.length; i++) {
       var p = picks[i];
       if ((kind === null || kind === p.kind) && (!p.detailed || (p.app && appFor(p.app)))) list.push(p);
@@ -519,6 +572,7 @@ var Data = (function () {
     setApps: function (apps) { installed = apps; },
     appFor: appFor,
     refresh: function () { refreshWeather(); refreshPrices(); refreshRecs(); },
+    refreshWeather: function (force) { if (force) weatherAt = 0; refreshWeather(); },
     settingsChanged: function () { pricesAt = 0; refreshPrices(); changed(); },
     get weather() { return weather; },
     get weatherAt() { return weatherAt; },
@@ -530,7 +584,11 @@ var Data = (function () {
     recsError: function () { return recsError; },
     picks: now,
     showcase: all,
-    image: function (path, size) { return path ? 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path : ''; },
+    image: function (path, size) {
+      if (!path) return '';
+      if (path.indexOf('wallpapers/') === 0 || path.indexOf('http') === 0) return path;
+      return 'https://image.tmdb.org/t/p/' + (size || 'w1280') + path;
+    },
 
     /** Night at the location: from sunset to sunrise (the last forecast; without one, 6:00 and 18:00). */
     isNight: function (at) {

@@ -436,7 +436,40 @@ var TV = (function () {
       if (samsung) {
         try { return window.tizen.time.getLocalTimezone() || ''; } catch (e) {}
       }
-      try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; }
+      try {
+        var z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (z) return z;
+      } catch (e) {}
+      return 'America/Sao_Paulo';
+    },
+
+    /** Get current sound output: 'tv_speaker', 'external_optical', 'external_arc', etc. */
+    getSoundOutput: function (done) {
+      if (!webos) {
+        if (done) setTimeout(function () { done('external_optical'); }, 0);
+        return;
+      }
+      luna('luna://com.webos.settingsservice/getSystemSettings',
+        {category: 'sound', keys: ['soundOutput']},
+        function (res) {
+          var mode = (res && res.settings && res.settings.soundOutput) || null;
+          if (done) done(mode);
+        }
+      );
+    },
+
+    /** Set current sound output; done(ok). */
+    setSoundOutput: function (mode, done) {
+      if (!webos) {
+        if (done) setTimeout(function () { done(true); }, 0);
+        return;
+      }
+      luna('luna://com.webos.settingsservice/setSystemSettings',
+        {category: 'sound', settings: {soundOutput: mode}},
+        function (res) {
+          if (done) done(!!(res && res.returnValue !== false));
+        }
+      );
     },
 
     /** Key codes: the arrows, OK and the TV's Back (LG 461, Samsung 10009). */

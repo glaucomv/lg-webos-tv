@@ -46,8 +46,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .sym {
   display: inline-block;
   -webkit-mask-size: contain;
+  mask-size: contain;
   -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
   -webkit-mask-position: center;
+  mask-position: center;
   background-color: currentColor;
 }
 
@@ -319,6 +322,44 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 .night #clock .time { color: #F5F5F7; }
 .night #clock .date { color: rgba(245, 245, 247, 0.65); }
+
+/* MARK: - Weather Pill Badge */
+#weather-badge {
+  position: absolute;
+  left: 620px;
+  top: 64px;
+  height: 52px;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  padding: 0 20px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  color: #FFF;
+  font-size: 22px;
+  font-weight: 600;
+  pointer-events: none;
+  -webkit-transition: opacity 0.3s;
+  transition: opacity 0.3s;
+}
+#weather-badge .wx-icon {
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+}
+#weather-badge .wx-temp {
+  font-size: 24px;
+  font-weight: 700;
+  margin-right: 12px;
+}
+#weather-badge .wx-city {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+}
 
 /* MARK: - Hero Spotlight */
 #spotlight {
@@ -768,7 +809,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   color: #FFF;
   background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
   background: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
   white-space: nowrap;
 }
 #saver .clock .time { font-size: 150px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; font-feature-settings: 'tnum'; }

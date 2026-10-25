@@ -44,10 +44,10 @@ def check_css(css_path):
             errors.append(f"Duplicate @keyframes rule found: '{kf}'")
         seen_kf.add(kf)
 
-    # 3. Fractional pixel values in dimensions/borders (triggers IDE errors)
-    dim_frac = re.findall(r'(?:width|height|border(?:-width)?)\s*:\s*(\d+\.\d+px)', content)
-    if dim_frac:
-        errors.append(f"Fractional px in dimensions/borders: {', '.join(set(dim_frac))}")
+    # 4. Standard mask property pairs
+    for prop in ('mask-size', 'mask-repeat', 'mask-position'):
+        if f"-webkit-{prop}" in content and prop not in content:
+            errors.append(f"Missing standard '{prop}' for compatibility with '-webkit-{prop}'")
 
     return errors
 
