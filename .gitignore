@@ -1,0 +1,55 @@
+# ==========================================
+# SEGURANÇA E CREDENCIAIS (NÃO COMITAR)
+# ==========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pub
+id_rsa*
+webos_rsa*
+/etc/
+
+# ==========================================
+# CONFIGURAÇÕES PESSOAIS DA APLICAÇÃO
+# ==========================================
+config.properties
+!config.example.properties
+
+# ==========================================
+# PACOTES E BUILDS WEBOS (BINÁRIOS)
+# ==========================================
+*.ipk
+*.tar.gz
+*.zip
+dist/
+build/
+bin/
+out/
+
+# ==========================================
+# LOGS E DADOS VOLÁTEIS
+# ==========================================
+*.log
+/tmp/
+logs/
+
+# ==========================================
+# PYTHON & NODE (CACHES DE AMBIENTE)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# ARQUIVOS DE SISTEMA E IDES
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

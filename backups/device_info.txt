@@ -1,0 +1,9 @@
+=== OS Release ===
+ID=starfish
+NAME="webOS TV"
+VERSION="10.3.2"
+VERSION_ID=10.3.2
+PRETTY_NAME="webOS TV 10.3.2"
+
+=== Kernel / Architecture ===
+Linux MiWiFi-RA82-srv 5.4.268-294.24.papikonda.2 #1 SMP PREEMPT Mon Jan 19 10:08:01 UTC 2026 aarch64 GNU/Linux

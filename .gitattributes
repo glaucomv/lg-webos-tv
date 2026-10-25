@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare shell scripts to always use LF (critical for Linux / webOS execution)
+*.sh text eol=lf
