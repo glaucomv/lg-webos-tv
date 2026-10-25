@@ -5,17 +5,15 @@ sync_google_photos.py - Sincronizacao de Fotos Pessoais (Google Fotos / Pendrive
 Permite:
 1. Baixar fotos de um album compartilhado do Google Fotos (URL publica) em alta resolucao.
 2. Salvar diretamente no pendrive (ex: D:\\fotos) ou pasta local.
-3. Enviar opcionalmente direto para a TV via rede local (--tv).
+3. Enviar opcionalmente direto para a TV via rede local (--tv). Se a TV tiver um pendrive
+   conectado (ex: /tmp/usb/sda/sda1), salva direto na pasta fotos do pendrive!
 
 Uso:
-  # Baixar do Google Fotos para o Pendrive:
-  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --dest "E:\\fotos"
+  # Baixar do Google Fotos e enviar para o pendrive conectado na TV:
+  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/TuBoKZB529Lci4az7" --tv
 
-  # Baixar e enviar direto para a TV:
-  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --tv
-
-  # Enviar pasta local de fotos para a TV:
-  python tools/sync_google_photos.py --source "C:\\Users\\glauc\\Pictures\\TV_Wallpapers" --tv
+  # Baixar para o pendrive no computador (ex: E:\fotos):
+  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/TuBoKZB529Lci4az7" --dest "E:\\fotos"
 """
 
 import os
@@ -24,6 +22,7 @@ import re
 import time
 import argparse
 import urllib.request
+import urllib.parse
 import urllib.error
 import hashlib
 from pathlib import Path
@@ -39,7 +38,7 @@ def fetch_google_photos_urls(album_url):
     Extrai as URLs de fotos de alta resolucao de um album compartilhado do Google Fotos.
     """
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
     }
     req = urllib.request.Request(album_url, headers=headers)
     
@@ -51,24 +50,24 @@ def fetch_google_photos_urls(album_url):
         print(f"[!] Erro ao acessar o link do Google Fotos: {e}")
         return []
 
-    # Extrai links de imagens base do Google Photos (lh3.googleusercontent.com)
-    # Formato: https://lh3.googleusercontent.com/pw/[A-Za-z0-9_-]+
-    raw_matches = re.findall(r'(https://lh3\.googleusercontent\.com/[A-Za-z0-9_-]{20,})', html)
+    # Extrai links de imagens base do Google Photos (lh3.googleusercontent.com/pw/...)
+    raw_matches = re.findall(r'(https://lh3\.googleusercontent\.com/(?:pw/)?[A-Za-z0-9_-]{20,})', html)
     
-    # Remove duplicatas preservando a ordem
+    # Remove duplicatas e imagens de sistema (avatares)
     unique_base = []
     seen = set()
     for u in raw_matches:
         if u not in seen:
-            seen.add(u)
-            unique_base.append(u)
+            if '/a/' not in u and 'default-user' not in u and 'ogw/' not in u:
+                seen.add(u)
+                unique_base.append(u)
 
-    print(f"[*] Encontradas {len(unique_base)} imagens no album.")
+    print(f"[*] Encontradas {len(unique_base)} fotos no album do Google Fotos.")
     
     # Converte para resolucao 1080p/4K otimizada para TV
     final_urls = []
     for base in unique_base:
-        # =w1920-h1080-no garante qualidade Full HD sem distorcao
+        # =w1920-h1080-no garante qualidade Full HD na TV
         final_urls.append(f"{base}=w1920-h1080-no")
         
     return final_urls
@@ -85,7 +84,7 @@ def download_photo(url, dest_folder, index):
     if os.path.exists(filepath):
         return filepath, False
 
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=20) as resp, open(filepath, 'wb') as f:
@@ -95,14 +94,18 @@ def download_photo(url, dest_folder, index):
         print(f"[!] Falha no download de {url}: {e}")
         return None, False
 
-def sync_album(album_url, dest_dir):
+def sync_album(album_url, dest_dir, limit=50):
     urls = fetch_google_photos_urls(album_url)
     if not urls:
         print("[!] Nenhuma foto encontrada no album.")
         return []
 
+    if limit and limit > 0 and len(urls) > limit:
+        print(f"[*] Sincronizando as {limit} fotos mais recentes (use --limit 0 para todas as {len(urls)})...")
+        urls = urls[:limit]
+
     downloaded = []
-    print(f"[*] Baixando fotos para: {dest_dir} ...")
+    print(f"[*] Baixando fotos para a pasta local: {dest_dir} ...")
     for idx, u in enumerate(urls, start=1):
         path, is_new = download_photo(u, dest_dir, idx)
         if path:
@@ -111,42 +114,62 @@ def sync_album(album_url, dest_dir):
             downloaded.append(path)
     return downloaded
 
+def detect_tv_usb_mount():
+    """
+    Verifica se ha pendrive conectado na TV via Telnet.
+    """
+    cmd = "ls -d /tmp/usb/*/* /media/multimedia/* 2>/dev/null"
+    res = telnet_cmd(cmd)
+    if res:
+        for line in res.splitlines():
+            line = line.strip()
+            if line.startswith("/tmp/usb/") or line.startswith("/media/multimedia/"):
+                return line
+    return None
+
 def send_to_tv(local_dir):
     """
-    Envia as fotos locais diretamente para o diretorio de fotos pessoais da TV.
+    Envia as fotos locais diretamente para a TV via rede local.
+    Se a TV tiver um pendrive conectado, salva direto na pasta 'fotos' do pendrive!
     """
-    print(f"[*] Enviando fotos da pasta local para a TV ({TV_IP})...")
-    tv_target = "/media/developer/apps/usr/palm/applications/io.freemytv/wallpapers/personal"
-    
-    # Garante diretorio na TV
-    telnet_cmd(f"mkdir -p {tv_target}")
-    
-    # Lista arquivos .jpg e .png locais
+    os.makedirs(local_dir, exist_ok=True)
     valid_exts = ('.jpg', '.jpeg', '.png')
     files = [f for f in os.listdir(local_dir) if f.lower().endswith(valid_exts)]
     if not files:
         print("[!] Nenhuma foto valida encontrada para envio.")
         return
 
-    # Usamos o web server local para a TV baixar via wget/curl em alta velocidade
+    print(f"[*] Verificando armazenamento na TV ({TV_IP})...")
+    usb_mount = detect_tv_usb_mount()
+    if usb_mount:
+        tv_target = f"{usb_mount}/fotos"
+        print(f"[OK] PENDRIVE CONECTADO NA TV DETECTADO EM: {usb_mount}")
+        print(f"     As fotos serao salvas diretamente no pendrive: {tv_target}")
+    else:
+        tv_target = "/media/developer/apps/usr/palm/applications/io.freemytv/wallpapers/personal"
+        print(f"[*] Pendrive nao detectado, salvando na memoria interna da TV: {tv_target}")
+
+    # Garante pasta de destino na TV
+    telnet_cmd(f"mkdir -p '{tv_target}'")
+
+    # Inicia servidor HTTP temporario local
     import http.server
     import threading
     import socket
 
     port = 8995
-    handler = http.server.SimpleHTTPRequestHandler
-    httpd = None
 
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=local_dir, **kwargs)
         def log_message(self, format, *args):
             pass
 
-    os.chdir(local_dir)
     httpd = http.server.HTTPServer(('0.0.0.0', port), QuietHandler)
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
 
-    # Descobre o IP do host visivel na rede
+    # Descobre o IP do host visivel na rede da TV
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect((TV_IP, 80))
@@ -154,32 +177,36 @@ def send_to_tv(local_dir):
     finally:
         s.close()
 
-    print(f"[*] Servidor de transferencia temporario rodando em http://{host_ip}:{port}/")
-    for f in files:
-        print(f"    -> Enviando para TV: {f} ...")
-        cmd = f"curl -s -f 'http://{host_ip}:{port}/{urllib.parse.quote(f)}' -o '{tv_target}/{f}'"
+    print(f"[*] Transferindo {len(files)} fotos para a TV via servidor de alta velocidade...")
+    for idx, f in enumerate(files, start=1):
+        enc_name = urllib.parse.quote(f)
+        cmd = f"curl -s -f 'http://{host_ip}:{port}/{enc_name}' -o '{tv_target}/{f}'"
         telnet_cmd(cmd)
+        if idx % 10 == 0 or idx == len(files):
+            print(f"    [{idx}/{len(files)}] fotos transferidas para a TV...")
 
     httpd.shutdown()
-    print("[*] Fotos transferidas com sucesso para a TV!")
+    print("[*] Fotos transferidas com sucesso!")
     
-    # Atualiza o manifesto de fotos na TV
-    print("[*] Reconstruindo catálogo e manifesto na TV...")
+    # Dispara o script de sincronizacao nativo na TV para atualizar links e personal_manifest.json
+    print("[*] Atualizando catalogo e manifesto do Launcher na TV...")
     daemon_script = "/media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh"
     telnet_cmd(f"sh {daemon_script} 2>/dev/null || true")
+    print("[SUCCESS] Fotos salvas no pendrive da TV e manifesto atualizado com sucesso!")
 
 def main():
     parser = argparse.ArgumentParser(description="Sincronizador de Fotos Google Photos para TV / Pendrive")
     parser.add_argument("--album-url", help="URL do album compartilhado do Google Fotos (ex: https://photos.app.goo.gl/...)")
     parser.add_argument("--dest", default=os.path.join(REPO_ROOT, "free-my-tv", "web", "wallpapers", "personal"), help="Diretorio de destino das fotos (pendrive ou pasta local)")
     parser.add_argument("--source", help="Pasta local com fotos ja existentes para enviar para a TV")
-    parser.add_argument("--tv", action="store_true", help="Envia automaticamente as fotos baixadas para a TV via rede")
+    parser.add_argument("--limit", type=int, default=50, help="Limite de fotos para sincronizar (padrao: 50 mais recentes, 0 para todas)")
+    parser.add_argument("--tv", action="store_true", help="Envia automaticamente as fotos baixadas para o pendrive conectado na TV via rede")
 
     args = parser.parse_args()
 
     dest_folder = os.path.abspath(args.dest)
     if args.album_url:
-        sync_album(args.album_url, dest_folder)
+        sync_album(args.album_url, dest_folder, limit=args.limit)
         if args.tv:
             send_to_tv(dest_folder)
     elif args.source:

@@ -23,6 +23,7 @@ ALLOWED_DOC_PLACEHOLDER_FILES = {
     "tools/sync_wallpapers.py",
     "tools/install_daemon.py",
     "tools/backup_tv_configs.py",
+    "tools/sync_google_photos.py",
     "tools/security_guard.py"
 }
 
@@ -31,6 +32,7 @@ FORBIDDEN_TRACKED_PATTERNS = [
     r'^\.env$',
     r'^\.env\..+$',
     r'^backup_local/',
+    r'.*wallpapers/personal/.*',
     r'.*\.ipk$',
     r'.*\.zip$',
     r'.*\.tar\.gz$',

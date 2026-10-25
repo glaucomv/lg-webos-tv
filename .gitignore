@@ -13,10 +13,12 @@ webos_rsa*
 backup_local/
 
 # ==========================================
-# CONFIGURAÇÕES PESSOAIS DA APLICAÇÃO
+# CONFIGURAÇÕES PESSOAIS DA APLICAÇÃO E FOTOS
 # ==========================================
 config.properties
 !config.example.properties
+free-my-tv/web/wallpapers/personal/
+free-my-tv/web/wallpapers/personal/*
 
 # ==========================================
 # PACOTES E BUILDS WEBOS (BINÁRIOS)
