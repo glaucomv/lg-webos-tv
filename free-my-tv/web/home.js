@@ -682,20 +682,34 @@
     return 'Todas (Fotos & OLED)';
   }
 
+  // Algoritmo Fisher-Yates para garantir aleatoriedade real, uniforme e sem vício
+  function shuffle(arr) {
+    if (!arr || !arr.length) return [];
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+    return a;
+  }
+
   function cycleWallpaperMode(d) {
     var modes = ['all', 'personal', 'curated'];
     var cur = Prefs.wallpaperMode();
     var idx = modes.indexOf(cur);
     var next = modes[(idx + (d || 1) + modes.length) % modes.length];
     Prefs.set('wallpaperMode', next);
-    currentWallIdx = 0;
-    var list = getActiveWallpapers();
-    if (list.length) setWallpaper(list[0].url);
+    wallDeck = [];
+    saverDeck = [];
+    nextWallpaper();
     toast(wallpaperModeLabel());
     if (st.zone === Z.SETTINGS) renderSettings();
   }
 
-  var currentWallIdx = 0;
+  var wallDeck = [];
+  var currentWallUrl = '';
   var wallFront = 'wallA';
   var wallTimer = null;
 
@@ -718,8 +732,20 @@
   function nextWallpaper() {
     var list = getActiveWallpapers();
     if (!list || !list.length) return;
-    currentWallIdx = (currentWallIdx + 1) % list.length;
-    setWallpaper(list[currentWallIdx].url);
+    if (!wallDeck.length) {
+      wallDeck = shuffle(list);
+      if (wallDeck.length > 1 && wallDeck[0].url === currentWallUrl) {
+        var swapIdx = 1 + Math.floor(Math.random() * (wallDeck.length - 1));
+        var tmp = wallDeck[0];
+        wallDeck[0] = wallDeck[swapIdx];
+        wallDeck[swapIdx] = tmp;
+      }
+    }
+    var pick = wallDeck.shift();
+    if (pick) {
+      currentWallUrl = pick.url;
+      setWallpaper(pick.url);
+    }
   }
 
   function loadPersonalManifest() {
@@ -733,8 +759,9 @@
             var data = JSON.parse(xhr.responseText);
             if (Array.isArray(data) && data.length > 0) {
               WALLPAPER_CATALOG.personal = data;
-              var list = getActiveWallpapers();
-              if (list && list.length) setWallpaper(list[0].url);
+              wallDeck = [];
+              saverDeck = [];
+              nextWallpaper();
             }
           } catch (e) {}
         }
@@ -746,7 +773,7 @@
   function initWallpaper() {
     var list = getActiveWallpapers();
     if (list && list.length) {
-      setWallpaper(list[0].url);
+      nextWallpaper();
       if (wallTimer) clearInterval(wallTimer);
       wallTimer = setInterval(nextWallpaper, 60000);
     }
@@ -1543,15 +1570,34 @@
     try { localStorage.setItem('fmtv.night', night ? 'true' : 'false'); } catch (e) {}   // for index.html, next start
   }
 
-  var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
+  var saverOn = false, idleAt = Date.now(), saverTimer = 0, SAVER_AFTER = 5 * 60000;
+  var saverDeck = [];
+  var lastSaverUrl = '';
 
   /** The screensaver's photos: picks with an app on the TV. */
   function saverPhotos() {
     return Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
   }
 
+  function nextSaverPhoto(list) {
+    if (!list || !list.length) return null;
+    if (!saverDeck.length) {
+      saverDeck = shuffle(list);
+      if (saverDeck.length > 1 && saverDeck[0].url === lastSaverUrl) {
+        var swapIdx = 1 + Math.floor(Math.random() * (saverDeck.length - 1));
+        var tmp = saverDeck[0];
+        saverDeck[0] = saverDeck[swapIdx];
+        saverDeck[swapIdx] = tmp;
+      }
+    }
+    var pick = saverDeck.shift();
+    if (pick) lastSaverUrl = pick.url;
+    return pick;
+  }
+
   function showSaver() {
     var list = getActiveWallpapers();
+    if (!list || !list.length) return;
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
@@ -1562,9 +1608,19 @@
     el('div', 'date', clock);
     el('div', 'title', clock);
     var front = a;
+
+    // Sempre inicia o repouso com um novo baralho aleatório
+    saverDeck = shuffle(list);
+    if (saverDeck.length > 1 && saverDeck[0].url === lastSaverUrl) {
+      var swapIdx = 1 + Math.floor(Math.random() * (saverDeck.length - 1));
+      var tmp = saverDeck[0];
+      saverDeck[0] = saverDeck[swapIdx];
+      saverDeck[swapIdx] = tmp;
+    }
+
     function next() {
       if (!saverOn) return;
-      var p = (list && list.length) ? list[saverIndex++ % list.length] : null;
+      var p = nextSaverPhoto(list);
       var back = front === a ? b : a;
       if (p) {
         back.bg.style.backgroundImage = 'url("' + p.url + '")';
