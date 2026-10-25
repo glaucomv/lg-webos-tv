@@ -1555,7 +1555,7 @@
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
-    var a = el('div', 'photo', s), b = el('div', 'photo', s);
+    var a = createSaverPhoto(s), b = createSaverPhoto(s);
     el('div', 'shade', s);
     var clock = el('div', 'clock', s);
     el('div', 'time', clock);
@@ -1567,11 +1567,12 @@
       var p = (list && list.length) ? list[saverIndex++ % list.length] : null;
       var back = front === a ? b : a;
       if (p) {
-        back.style.backgroundImage = 'url("' + p.url + '")';
+        back.bg.style.backgroundImage = 'url("' + p.url + '")';
+        back.fg.style.backgroundImage = 'url("' + p.url + '")';
         clock.lastChild.textContent = p.title || '';
         setTimeout(function () {
-          setClass(back, 'on', true);
-          setClass(front, 'on', false);
+          setClass(back.el, 'on', true);
+          setClass(front.el, 'on', false);
           front = back;
         }, 60);
       }
@@ -1580,6 +1581,13 @@
     }
     setClass(s, 'on', true);
     next();
+  }
+
+  function createSaverPhoto(parent) {
+    var p = el('div', 'photo', parent);
+    var bg = el('div', 'bg', p);
+    var fg = el('div', 'fg', p);
+    return { el: p, bg: bg, fg: fg };
   }
 
   function tickSaverClock(clock) {

@@ -13,14 +13,17 @@ param (
     [string]$PendriveFolder = "",
 
     [Parameter(Mandatory=$false)]
-    [switch]$SendToTv
+    [switch]$SendToTv,
+
+    [Parameter(Mandatory=$false)]
+    [int]$Limit = 150
 )
 
 $TaskName = "SyncGooglePhotosToLGTV"
 $PythonExe = (Get-Command python).Source
 $ScriptPath = Join-Path $PSScriptRoot "sync_google_photos.py"
 
-$ArgsList = "`"$ScriptPath`" --album-url `"$AlbumUrl`""
+$ArgsList = "`"$ScriptPath`" --album-url `"$AlbumUrl`" --limit $Limit"
 if ($PendriveFolder) {
     $ArgsList += " --dest `"$PendriveFolder`""
 }

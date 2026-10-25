@@ -814,8 +814,44 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 #saver { background: #000; opacity: 0; visibility: hidden; -webkit-transition: opacity 1.2s, visibility 0s 1.2s; transition: opacity 1.2s, visibility 0s 1.2s; }
 #saver.on { opacity: 1; visibility: visible; -webkit-transition-delay: 0s; transition-delay: 0s; }
-#saver .photo { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 1.5s ease-in-out; transition: opacity 1.5s ease-in-out; }
+#saver .photo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  opacity: 0;
+  -webkit-transition: opacity 1.5s ease-in-out;
+  transition: opacity 1.5s ease-in-out;
+  overflow: hidden;
+  background: #000;
+}
 #saver .photo.on { opacity: 1; }
+#saver .photo .bg {
+  position: absolute;
+  left: -40px;
+  top: -40px;
+  width: 2000px;
+  height: 1160px;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35;
+  -webkit-filter: blur(35px) brightness(0.65);
+  filter: blur(35px) brightness(0.65);
+  -webkit-transform: scale(1.05);
+  transform: scale(1.05);
+}
+#saver .photo .fg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: 0 10px 60px rgba(0, 0, 0, 0.7);
+}
 
 .tile, .card, .cell {
   contain: layout style;
