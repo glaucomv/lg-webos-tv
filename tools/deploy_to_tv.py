@@ -16,12 +16,19 @@ PORT = int(get_env_var("DEPLOY_HTTP_PORT", "8999"))
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=FREE_MY_TV_DIR, **kwargs)
+    def log_message(self, format, *args):
+        pass
 
 def deploy():
-    ipk_path = os.path.join(FREE_MY_TV_DIR, "FreeMyTV-webos.ipk")
-    if not os.path.exists(ipk_path):
-        print(f"IPK not found at {ipk_path}. Building first...")
-        os.system(f'python "{os.path.join(FREE_MY_TV_DIR, "webos", "build.py")}"')
+    from verify_build import run_all_checks
+    if not run_all_checks():
+        sys.exit(1)
+
+    print("Building fresh FreeMyTV-webos.ipk...")
+    build_rc = os.system(f'python "{os.path.join(FREE_MY_TV_DIR, "webos", "build.py")}"')
+    if build_rc != 0:
+        print("Build failed!")
+        sys.exit(1)
 
     socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
@@ -32,7 +39,7 @@ def deploy():
 
     time.sleep(0.5)
 
-    print(f"TV ({TV_IP}) downloading IPK from http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk...")
+    print("TV downloading IPK...")
     dl_res = telnet_cmd(f"curl -s -f -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk", timeout=10)
     print("TV download result:", dl_res)
 
@@ -44,22 +51,26 @@ def deploy():
     inst_res = telnet_cmd("luna-send -n 1 luna://com.webos.appInstallService/dev/install '{\"id\":\"io.freemytv\",\"ipkUrl\":\"/tmp/freemytv.ipk\",\"subscribe\":false}'", timeout=15)
     print("TV install result:", inst_res)
 
-    daemon_src = os.path.join(ROOT_DIR, "daemon", "15-sync-usb-photos.sh")
-    if os.path.exists(daemon_src):
-        with open(daemon_src, "r", encoding="utf-8") as f:
-            d_content = f.read()
-        telnet_cmd("mkdir -p /media/developer/apps/usr/palm/applications/io.freemytv/daemon")
-        telnet_cmd(f"cat << 'EOF' > /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh\n{d_content}\nEOF\nchmod +x /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh")
-        telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true")
-
     print("Waiting for webOS package extraction lock to release and launching Free My TV...")
-    for attempt in range(1, 6):
+    for attempt in range(1, 7):
         time.sleep(2)
         launch_res = telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"io.freemytv\"}'")
         if '"returnValue":true' in launch_res or 'app is locked' not in launch_res:
             print(f"TV launch result (attempt {attempt}):", launch_res)
             break
         print(f"  App still unlocking (attempt {attempt})...")
+
+    # Clean up temporary IPK from /tmp (RAM)
+    telnet_cmd("rm -f /tmp/freemytv.ipk")
+
+    daemon_src = os.path.join(ROOT_DIR, "daemon", "15-sync-usb-photos.sh")
+    if os.path.exists(daemon_src):
+        with open(daemon_src, "r", encoding="utf-8") as f:
+            d_content = f.read()
+        print("Syncing USB photo manifest on TV...")
+        telnet_cmd("mkdir -p /media/developer/apps/usr/palm/applications/io.freemytv/daemon")
+        telnet_cmd(f"cat << 'EOF' > /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh\n{d_content}\nEOF\nchmod +x /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh", timeout=8)
+        telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true", timeout=12)
 
     server.shutdown()
     print("Deployment finished successfully!")

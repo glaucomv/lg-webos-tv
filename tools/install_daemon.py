@@ -15,13 +15,16 @@ PORT = int(get_env_var("DEPLOY_HTTP_PORT", "8998"))
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DAEMON_DIR, **kwargs)
+    def log_message(self, format, *args):
+        pass
 
 def install():
+    socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer(("0.0.0.0", PORT), Handler)
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
     t.start()
-    print(f"HTTP server serving daemon from {DAEMON_DIR} on port {PORT}...")
+    print(f"HTTP server serving daemon on port {PORT}...")
 
     time.sleep(0.5)
 

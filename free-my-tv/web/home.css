@@ -94,17 +94,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at 50% 35%, rgba(11, 11, 14, 0.3) 0%, rgba(5, 6, 10, 0.72) 65%, rgba(2, 3, 5, 0.92) 100%);
+  background: radial-gradient(circle at 50% 35%, rgba(11, 11, 14, 0.18) 0%, rgba(5, 6, 10, 0.56) 65%, rgba(2, 3, 5, 0.84) 100%);
   pointer-events: none;
 }
 
 #sky canvas { position: absolute; left: -4%; top: -4%; width: 108%; height: 108%; opacity: 0; -webkit-transition: opacity 0.8s; transition: opacity 0.8s; }
 #sky canvas.on { opacity: 1; }
-#sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.74); -webkit-transition: background-color 2s; transition: background-color 2s; }
+#sky .veil { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(245, 245, 247, 0.62); -webkit-transition: background-color 2s; transition: background-color 2s; }
 #sky .lift { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #FFF; opacity: 0; -webkit-transition: opacity 0.45s, background-color 2s; transition: opacity 0.45s, background-color 2s; }
 .night #sky .day { opacity: 0; }
 .night #sky .night { opacity: 1; }
-.night #sky .veil { background: rgba(11, 11, 13, 0.78); }
+.night #sky .veil { background: rgba(8, 9, 12, 0.68); }
 .night #sky .lift { background: #000; }
 .drawer-open #sky .lift { opacity: 0.32; }
 .night.drawer-open #sky .lift { opacity: 0.42; }
@@ -322,8 +322,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   color: #8E8E93;
   text-transform: capitalize;
 }
-.night #clock .time { color: #F5F5F7; }
-.night #clock .date { color: rgba(245, 245, 247, 0.65); }
+.night #clock .time { color: #F5F5F7; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45); }
+.night #clock .date { color: rgba(245, 245, 247, 0.72); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4); }
 
 /* MARK: - Weather Pill Badge */
 #weather-badge {
@@ -337,15 +337,21 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   align-items: center;
   padding: 0 20px;
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  color: #FFF;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  color: #1D1D1F;
   font-size: 22px;
   font-weight: 600;
   pointer-events: none;
-  -webkit-transition: opacity 0.3s;
-  transition: opacity 0.3s;
+  -webkit-transition: opacity 0.3s, background-color 0.3s, color 0.3s;
+  transition: opacity 0.3s, background-color 0.3s, color 0.3s;
+}
+.night #weather-badge {
+  background: rgba(24, 24, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #F5F5F7;
 }
 #weather-badge .wx-icon {
   width: 28px;
@@ -359,8 +365,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 #weather-badge .wx-city {
   font-size: 18px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #6E6E73;
   font-weight: 500;
+}
+.night #weather-badge .wx-city {
+  color: rgba(245, 245, 247, 0.72);
 }
 
 /* MARK: - Hero Spotlight */
@@ -538,17 +547,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: color 0.2s;
   transition: color 0.2s;
 }
-.night #spot-title { color: #FFF; }
+.night #spot-title { color: #FFF; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); }
 
 #spot-desc {
   margin: 14px 0 0 0;
   font-size: 26px;
   font-weight: 400;
-  color: #6E6E73;
+  color: #48484A;
   max-width: 950px;
   line-height: 1.35;
 }
-.night #spot-desc { color: rgba(245, 245, 247, 0.72); }
+.night #spot-desc { color: rgba(245, 245, 247, 0.78); text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); }
 
 #spot-hint {
   margin-top: 26px;
@@ -558,9 +567,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   align-items: center;
   font-size: 20px;
   font-weight: 500;
-  color: #8E8E93;
+  color: #6E6E73;
 }
-.night #spot-hint { color: rgba(245, 245, 247, 0.45); }
+.night #spot-hint { color: rgba(245, 245, 247, 0.58); }
 .hint-badge {
   display: inline-block;
   padding: 4px 10px;
@@ -662,16 +671,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   top: 0;
   right: 0;
   height: 50%;
-  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
-  background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0));
+  background: linear-gradient(rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0));
   opacity: 0;
   -webkit-transition: opacity 0.17s;
   transition: opacity 0.17s;
 }
-.tile.focus { -webkit-transform: scale(1.2); transform: scale(1.2); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34); z-index: 2; }
 .tile.focus::after { opacity: 1; }
 .night .tile { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.3); }
-.night .tile.focus { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6); }
+.night .tile.focus { box-shadow: 0 22px 50px rgba(0, 0, 0, 0.65), 0 0 0 2.5px #FFF, 0 0 30px rgba(255, 255, 255, 0.28); }
 .more { position: absolute; width: 17px; height: 17px; color: rgba(0, 0, 0, 0.6); }
 .more.back { -webkit-transform: scaleX(-1); transform: scaleX(-1); }
 .night .more { color: rgba(255, 255, 255, 0.8); }
@@ -827,30 +835,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background: #000;
 }
 #saver .photo.on { opacity: 1; }
-#saver .photo .bg {
-  position: absolute;
-  left: -40px;
-  top: -40px;
-  width: 2000px;
-  height: 1160px;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.35;
-  -webkit-filter: blur(35px) brightness(0.65);
-  filter: blur(35px) brightness(0.65);
-  -webkit-transform: scale(1.05);
-  transform: scale(1.05);
-}
 #saver .photo .fg {
   position: absolute;
   left: 0;
   top: 0;
   width: 1920px;
   height: 1080px;
-  background-size: contain;
+  background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-  box-shadow: 0 10px 60px rgba(0, 0, 0, 0.7);
 }
 
 .tile, .card, .cell {

@@ -100,6 +100,7 @@ def check_content_leak():
     re_tmdb_populated = re.compile(r'tmdb_key=[a-zA-Z0-9_-]{10,}')
     re_watchmode_populated = re.compile(r'watchmode_key=[a-zA-Z0-9_-]{10,}')
     re_weather_populated = re.compile(r'weather_(?:lat|lon)=-?\d+\.\d+')
+    re_google_photos_leak = re.compile(r'https://photos\.app\.goo\.gl/(?!(?:EXEMPLO|SEU_ALBUM)\b)[A-Za-z0-9_-]{6,}')
     re_generic_private_ip = re.compile(r'\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})\b')
 
     for rel_path in all_files:
@@ -160,6 +161,8 @@ def check_content_leak():
                 errors.append(f"POPULATED API KEY in {rel_norm}:{idx}")
             if re_weather_populated.search(line_str) and rel_norm != ".env.example":
                 errors.append(f"REAL LOCATION COORDINATES in {rel_norm}:{idx}")
+            if re_google_photos_leak.search(line_str):
+                errors.append(f"REAL GOOGLE PHOTOS ALBUM LINK LEAK in {rel_norm}:{idx}")
 
             # 6. MAC addresses
             if re_mac.search(line_str):

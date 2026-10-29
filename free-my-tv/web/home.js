@@ -180,16 +180,23 @@
       }
     }
     // Nothing left, or nothing taken away (a picture rather than a logo on a background): keep the icon.
-    if (maxX < 0 || (maxX - minX > w * 0.96 && maxY - minY > h * 0.96)) return false;
+    if (maxX < 0 || (maxX - minX > w * 0.96 && maxY - minY > h * 0.96)) {
+      canvas.width = canvas.height = 0;
+      return false;
+    }
     var crop = document.createElement('canvas');
     crop.width = maxX - minX + 1;
     crop.height = maxY - minY + 1;
     g.putImageData(data, 0, 0);
     crop.getContext('2d').drawImage(canvas, minX, minY, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    canvas.width = canvas.height = 0;
     for (var b = 0; b < 8; b++) ink[b] /= inkSum;
     try {
-      return {src: crop.toDataURL('image/png'), bg: best, ink: ink};
+      var dataUrl = crop.toDataURL('image/png');
+      crop.width = crop.height = 0;
+      return {src: dataUrl, bg: best, ink: ink};
     } catch (e2) {
+      crop.width = crop.height = 0;
       return false;
     }
   }
@@ -440,18 +447,43 @@
   }
 
   var currentLiveVideoApp = null;
+  var lastSpotAppId = null;
 
-  function updateSpotlight() {
+  function safeCssUrl(url) {
+    return String(url || '').replace(/[\r\n"\\()]/g, '');
+  }
+
+  function stopLivePreview() {
+    var vid = $('tv-live-preview');
+    if (vid && currentLiveVideoApp) {
+      currentLiveVideoApp = null;
+      lastSpotAppId = null;
+      try {
+        vid.pause();
+        while (vid.firstChild) vid.removeChild(vid.firstChild);
+        vid.removeAttribute('src');
+        vid.load();
+      } catch (e) {}
+    }
+  }
+
+  function updateSpotlight(force) {
     var spot = $('spotlight');
     if (!spot || !shelf.length) return;
     var app = shelf[st.shelf] || shelf[0];
+    if (!force && lastSpotAppId === app.id) return;
+    lastSpotAppId = app.id;
     var meta = appMeta(app);
     if (!meta) return;
     var badge = $('spot-badge'), t = $('spot-title'), desc = $('spot-desc'), hint = $('spot-hint');
     if (badge) badge.textContent = meta.badge;
     if (t) t.textContent = meta.title;
     if (desc) desc.textContent = meta.tagline;
-    if (hint) hint.innerHTML = '<span class="hint-badge">OK</span> ' + meta.hint;
+    if (hint) {
+      hint.textContent = '';
+      el('span', 'hint-badge', hint, 'OK');
+      hint.appendChild(document.createTextNode(' ' + meta.hint));
+    }
 
     var previewBox = $('spot-preview-box');
     if (previewBox) {
@@ -476,7 +508,7 @@
       if (badgeText) badgeText.textContent = 'AO VIVO';
       if (pBadge) pBadge.style.background = 'rgba(220, 38, 38, 0.9)';
 
-      if (vid) {
+      if (vid && !document.hidden) {
         vid.style.display = 'block';
         if (currentLiveVideoApp !== app.id) {
           currentLiveVideoApp = app.id;
@@ -493,15 +525,8 @@
       }
     } else {
       if (vid) {
-        if (currentLiveVideoApp) {
-          currentLiveVideoApp = null;
-          try {
-            vid.pause();
-            while (vid.firstChild) vid.removeChild(vid.firstChild);
-            vid.removeAttribute('src');
-            vid.load();
-          } catch (e) {}
-        }
+        stopLivePreview();
+        lastSpotAppId = app.id;
         vid.style.display = 'none';
       }
 
@@ -519,7 +544,7 @@
 
       if (appImg) {
         appImg.style.display = 'block';
-        appImg.style.backgroundImage = 'url("' + (meta.preview || 'wallpapers/aurora.jpg') + '")';
+        appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
       }
     }
   }
@@ -682,17 +707,42 @@
     return 'Todas (Fotos & OLED)';
   }
 
-  // Algoritmo Fisher-Yates para garantir aleatoriedade real, uniforme e sem vício
+  function normalizeWallpaper(item) {
+    if (!item) return null;
+    if (typeof item === 'string') {
+      var u = item.indexOf('/') >= 0 ? item : ('wallpapers/personal/' + item);
+      var bname = item.slice(item.lastIndexOf('/') + 1).replace(/\.[^.]*$/, '').replace(/_/g, ' ');
+      return {url: u, title: formatSaverTitle(bname)};
+    }
+    return {url: item.url, title: formatSaverTitle(item.title)};
+  }
+
+  // Algoritmo Fisher-Yates com amostragem máxima (250 itens por baralho) para poupar RAM em álbuns de 5.000+ fotos
+  var MAX_DECK_SIZE = 250;
   function shuffle(arr) {
     if (!arr || !arr.length) return [];
-    var a = arr.slice();
-    for (var i = a.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = a[i];
-      a[i] = a[j];
-      a[j] = t;
+    var len = arr.length;
+    if (len <= MAX_DECK_SIZE) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+      var outSmall = [];
+      for (var s = 0; s < a.length; s++) outSmall.push(normalizeWallpaper(a[s]));
+      return outSmall;
     }
-    return a;
+    var picked = {}, out = [];
+    while (out.length < MAX_DECK_SIZE) {
+      var idx = Math.floor(Math.random() * len);
+      if (!picked[idx]) {
+        picked[idx] = true;
+        out.push(normalizeWallpaper(arr[idx]));
+      }
+    }
+    return out;
   }
 
   function cycleWallpaperMode(d) {
@@ -721,7 +771,8 @@
 
     var img = new Image();
     img.onload = function () {
-      nextEl.style.backgroundImage = 'url("' + url + '")';
+      img.onload = null;
+      nextEl.style.backgroundImage = 'url("' + safeCssUrl(url) + '")';
       setClass(nextEl, 'on', true);
       setClass(frontEl, 'on', false);
       wallFront = next;
@@ -730,6 +781,7 @@
   }
 
   function nextWallpaper() {
+    if (document.hidden || saverOn) return;
     var list = getActiveWallpapers();
     if (!list || !list.length) return;
     if (!wallDeck.length) {
@@ -770,12 +822,23 @@
     } catch (e) {}
   }
 
+  function startWallpaperTimer() {
+    if (wallTimer) clearInterval(wallTimer);
+    wallTimer = setInterval(nextWallpaper, 60000);
+  }
+
+  function stopWallpaperTimer() {
+    if (wallTimer) {
+      clearInterval(wallTimer);
+      wallTimer = null;
+    }
+  }
+
   function initWallpaper() {
     var list = getActiveWallpapers();
     if (list && list.length) {
       nextWallpaper();
-      if (wallTimer) clearInterval(wallTimer);
-      wallTimer = setInterval(nextWallpaper, 60000);
+      startWallpaperTimer();
     }
     loadPersonalManifest();
   }
@@ -1499,7 +1562,8 @@
         }
         break;
       case Z.EDIT:
-        if (dy) st.edit = Math.max(0, Math.min(apps.length - 1, st.edit + dy));
+        var maxEdit = (editRows || apps).length - 1;
+        if (dy) st.edit = Math.max(0, Math.min(maxEdit, st.edit + dy));
         else if (dx) editShelf(dx);
         break;
       case Z.LANG:
@@ -1531,6 +1595,17 @@
       if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
+      var prevZone = st.zone;
+      var sameIndex = (zone === Z.TOP && st.top === index) ||
+                      (zone === Z.CARDS && st.card === index) ||
+                      (zone === Z.SHELF && st.shelf === index) ||
+                      (zone === Z.DRAWER && st.drawer === index) ||
+                      (zone === Z.APPS && st.grid === index) ||
+                      (zone === Z.SETTINGS && st.row === index) ||
+                      (zone === Z.EDIT && st.edit === index) ||
+                      (zone === Z.LANG && st.lang === index) ||
+                      (zone === Z.POWERON && st.poweron === index);
+      if (prevZone === zone && sameIndex) return;
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
@@ -1595,10 +1670,17 @@
     return pick;
   }
 
+  function formatSaverTitle(raw) {
+    if (!raw) return '';
+    if (/^foto[\s_]pessoal/i.test(raw)) return 'Galeria Pessoal';
+    return raw;
+  }
+
   function showSaver() {
     var list = getActiveWallpapers();
     if (!list || !list.length) return;
     saverOn = true;
+    stopLivePreview();
     var s = $('saver');
     s.innerHTML = '';
     var a = createSaverPhoto(s), b = createSaverPhoto(s);
@@ -1622,15 +1704,18 @@
       if (!saverOn) return;
       var p = nextSaverPhoto(list);
       var back = front === a ? b : a;
-      if (p) {
-        back.bg.style.backgroundImage = 'url("' + p.url + '")';
-        back.fg.style.backgroundImage = 'url("' + p.url + '")';
-        clock.lastChild.textContent = p.title || '';
-        setTimeout(function () {
+      if (p && p.url) {
+        var pre = new Image();
+        pre.onload = function () {
+          pre.onload = null;
+          if (!saverOn) return;
+          back.fg.style.backgroundImage = 'url("' + safeCssUrl(p.url) + '")';
+          clock.lastChild.textContent = formatSaverTitle(p.title);
           setClass(back.el, 'on', true);
           setClass(front.el, 'on', false);
           front = back;
-        }, 60);
+        };
+        pre.src = p.url;
       }
       tickSaverClock(clock);
       saverTimer = setTimeout(next, 10000);
@@ -1641,21 +1726,27 @@
 
   function createSaverPhoto(parent) {
     var p = el('div', 'photo', parent);
-    var bg = el('div', 'bg', p);
     var fg = el('div', 'fg', p);
-    return { el: p, bg: bg, fg: fg };
+    return { el: p, fg: fg };
   }
 
   function tickSaverClock(clock) {
+    if (!clock) return;
     var d = new Date();
     clock.firstChild.textContent = formatDate('format|h:mm', d.getTime());
     clock.children[1].textContent = formatDate('format|EEEE, MMMM d', d.getTime());
   }
 
   function hideSaver() {
+    if (!saverOn) return;
     saverOn = false;
     clearTimeout(saverTimer);
-    setClass($('saver'), 'on', false);
+    var s = $('saver');
+    setClass(s, 'on', false);
+    setTimeout(function () {
+      if (!saverOn && s) s.innerHTML = '';
+    }, 1250);
+    if (!document.hidden && shelf.length) updateSpotlight(true);
   }
 
   function poke() {
@@ -1745,12 +1836,13 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       hideSaver();
-      var vid = $('tv-live-preview');
-      if (vid) { try { vid.pause(); } catch (e) {} }
+      stopWallpaperTimer();
+      stopLivePreview();
       return;
     }
     idleAt = Date.now();
-    loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
+    startWallpaperTimer();
+    loadApps(function () { renderShelf(); renderDrawer(); updateSpotlight(true); updateFocus(); Data.refresh(); });
   });
 
   I18N.set(Prefs.language());
@@ -1763,12 +1855,19 @@
   initWallpaper();
   initAudioOutput();
   updateWeatherBadge();
+  var spotPreview = $('spot-preview-box');
+  if (spotPreview) {
+    spotPreview.onclick = function () {
+      if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
+    };
+  }
   loadApps(function () {
     renderAll();
     updateWeatherBadge();
     Data.refresh();
   });
   setInterval(function () {
+    if (document.hidden) return;
     checkNight();
     Data.refresh();
     if (!saverOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) showSaver();

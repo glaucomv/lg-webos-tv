@@ -9,26 +9,35 @@ Permite:
 
 Uso:
   # Consultar total de fotos no album e no pendrive:
-  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/TuBoKZB529Lci4az7" --info
+  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --info
 
   # Baixar as 100 fotos mais recentes para o pendrive da TV:
-  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/TuBoKZB529Lci4az7" --tv --limit 100
+  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --tv --limit 100
 
   # Baixar todas as fotos do album (5.000+):
-  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/TuBoKZB529Lci4az7" --tv --limit 0
+  python tools/sync_google_photos.py --album-url "https://photos.app.goo.gl/EXEMPLO" --tv --limit 0
 """
 
+import io
 import os
 import sys
 import re
 import time
+import tarfile
 import argparse
 import urllib.request
 import urllib.parse
 import urllib.error
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+try:
+    from PIL import Image, ImageOps
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
 
 # Add repo root to sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -97,7 +106,7 @@ def fetch_google_photos_urls(album_url, limit=None):
     if limit and limit > 0 and len(all_bases) >= limit:
         all_bases = all_bases[:limit]
         print(f"[*] Limite de {limit} fotos atingido na pagina 1.")
-        return [f"{b}=w1920-h1080-no" for b in all_bases]
+        return [f"{b}=w1280-h720-no" for b in all_bases]
 
     # Paginacao para buscar mais fotos se o album tiver > 300 fotos
     rpc_url = "https://photos.google.com/_/PhotosUi/data/batchexecute"
@@ -136,15 +145,81 @@ def fetch_google_photos_urls(album_url, limit=None):
         all_bases = all_bases[:limit]
 
     print(f"[*] Total selecionado para sincronizacao: {len(all_bases)} fotos.")
-    # =w1920-h1080-no garante resolucao nativa Full HD sem distorcao
-    return [f"{b}=w1920-h1080-no" for b in all_bases]
+    # =w1280-h720-no garante excelente nitidez na TV com 55% menos consumo de RAM/VRAM por textura
+    return [f"{b}=w1280-h720-no" for b in all_bases]
+
+def optimize_image_bytes(raw_bytes, max_width=1280, max_height=720, quality=78):
+    """
+    Otimiza a imagem em memoria antes de gravar no disco/pendrive:
+    - Corrige orientacao EXIF automaticamente
+    - Redimensiona para ate 1280x720 (reduz consumo de RAM/VRAM em 55% na TV de 1.2GB)
+    - Remove metadados EXIF/ICC desnecessarios
+    - Aplica compressao JPEG progressiva otimizada
+    """
+    if not HAS_PILLOW or not raw_bytes:
+        return raw_bytes
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as im:
+            im = ImageOps.exif_transpose(im)
+            if im.mode != "RGB":
+                im = im.convert("RGB")
+            if im.width > max_width or im.height > max_height:
+                im.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            im.save(out, format="JPEG", quality=quality, optimize=True, progressive=True)
+            optimized = out.getvalue()
+            return optimized if len(optimized) < len(raw_bytes) or im.width <= max_width else raw_bytes
+    except Exception:
+        return raw_bytes
+
+
+def optimize_local_folder(folder_path, max_width=1280, max_height=720, quality=78):
+    """
+    Comprime e otimiza fotos ja existentes em uma pasta local ou pendrive.
+    """
+    if not HAS_PILLOW:
+        print("[!] Pillow (PIL) nao encontrado. Instale com: pip install Pillow")
+        return
+    if not os.path.isdir(folder_path):
+        print(f"[!] Pasta nao encontrada: {folder_path}")
+        return
+    valid_exts = ('.jpg', '.jpeg', '.png')
+    files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.lower().endswith(valid_exts)]
+    if not files:
+        print("[!] Nenhuma imagem encontrada para otimizar.")
+        return
+
+    print(f"[*] Otimizando {len(files)} fotos em {folder_path} (max {max_width}x{max_height}, JPEG q={quality})...")
+    saved_bytes = 0
+    count = 0
+    for fpath in files:
+        try:
+            orig_size = os.path.getsize(fpath)
+            # Pula arquivos ja muito pequenos e otimizados (< 95 KB)
+            if orig_size < 95 * 1024:
+                continue
+            with open(fpath, "rb") as f:
+                raw = f.read()
+            opt = optimize_image_bytes(raw, max_width=max_width, max_height=max_height, quality=quality)
+            if len(opt) < orig_size:
+                with open(fpath, "wb") as f:
+                    f.write(opt)
+                saved_bytes += (orig_size - len(opt))
+                count += 1
+        except Exception:
+            pass
+    print(f"[OK] {count} fotos recomprimidas! Economia total: {saved_bytes / (1024 * 1024):.1f} MB.")
+
 
 def download_photo(url, dest_folder, index):
     """
-    Baixa uma foto individual se ela ainda nao existir no destino.
+    Baixa uma foto individual se ela ainda nao existir no destino,
+    ja aplicando redimensionamento e compressao otimizada em memoria.
     """
     os.makedirs(dest_folder, exist_ok=True)
-    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    # Preserva o hash compativel com o sufixo historico para nao duplicar fotos ja baixadas
+    canonical_url = re.sub(r'=w\d+-h\d+-no$', '=w1920-h1080-no', url)
+    url_hash = hashlib.md5(canonical_url.encode()).hexdigest()[:8]
     filename = f"foto_pessoal_{index:04d}_{url_hash}.jpg"
     filepath = os.path.join(dest_folder, filename)
 
@@ -154,12 +229,16 @@ def download_photo(url, dest_folder, index):
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp, open(filepath, 'wb') as f:
-            f.write(resp.read())
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw_bytes = resp.read()
+        opt_bytes = optimize_image_bytes(raw_bytes)
+        with open(filepath, 'wb') as f:
+            f.write(opt_bytes)
         return filepath, True
     except Exception as e:
         print(f"[!] Falha no download da foto {index}: {e}")
         return None, False
+
 
 def sync_album(album_url, dest_dir, limit=100):
     urls = fetch_google_photos_urls(album_url, limit=limit)
@@ -168,21 +247,25 @@ def sync_album(album_url, dest_dir, limit=100):
         return []
 
     downloaded = []
-    print(f"[*] Verificando e baixando fotos para pasta local: {dest_dir} ...")
+    print(f"[*] Verificando, baixando e comprimindo fotos para: {dest_dir} ...")
     new_count = 0
     exist_count = 0
-    for idx, u in enumerate(urls, start=1):
-        path, is_new = download_photo(u, dest_dir, idx)
-        if path:
-            if is_new:
-                new_count += 1
-                if new_count <= 10 or new_count % 25 == 0:
-                    print(f"    [{idx}/{len(urls)}] (NOVA) {os.path.basename(path)}")
-            else:
-                exist_count += 1
-            downloaded.append(path)
 
-    print(f"[*] Download concluido: {new_count} fotos novas baixadas, {exist_count} fotos ja existentes.")
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {pool.submit(download_photo, u, dest_dir, idx): idx for idx, u in enumerate(urls, start=1)}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            path, is_new = fut.result()
+            if path:
+                if is_new:
+                    new_count += 1
+                    if new_count <= 10 or new_count % 25 == 0:
+                        print(f"    [{idx}/{len(urls)}] (NOVA OTIMIZADA) {os.path.basename(path)}")
+                else:
+                    exist_count += 1
+                downloaded.append(path)
+
+    print(f"[*] Sincronizacao local concluida: {new_count} fotos novas otimizadas, {exist_count} ja existentes.")
     return downloaded
 
 def detect_tv_usb_mount():
@@ -199,21 +282,21 @@ def detect_tv_usb_mount():
     return None
 
 def check_pendrive_photo_count():
-    cmd = "ls -1 /tmp/usb/sda/sda1/fotos/*.jpg 2>/dev/null | wc -l"
-    res = telnet_cmd(cmd)
+    cmd = "/bin/ls -1 /tmp/usb/sda/sda1/fotos 2>/dev/null | grep -iE '\\.(jpg|jpeg|png)$' | wc -l"
+    res = telnet_cmd(cmd, timeout=10)
     try:
-        return int(res.strip())
-    except:
+        return int(res.strip().splitlines()[-1])
+    except Exception:
         return 0
 
 def send_to_tv(local_dir):
     """
-    Envia as fotos locais diretamente para a TV via rede local.
+    Envia as fotos locais diretamente para a TV via rede local usando lotes TAR em streaming.
     Se a TV tiver um pendrive conectado, salva direto na pasta 'fotos' do pendrive!
     """
     os.makedirs(local_dir, exist_ok=True)
     valid_exts = ('.jpg', '.jpeg', '.png')
-    files = [f for f in os.listdir(local_dir) if f.lower().endswith(valid_exts)]
+    files = sorted([f for f in os.listdir(local_dir) if f.lower().endswith(valid_exts)])
     if not files:
         print("[!] Nenhuma foto valida encontrada para envio.")
         return
@@ -231,18 +314,17 @@ def send_to_tv(local_dir):
     # Garante pasta de destino na TV
     telnet_cmd(f"mkdir -p '{tv_target}'")
 
-    # Obtem lista de arquivos ja existentes na TV para transferir apenas os novos
-    existing_raw = telnet_cmd(f"ls -1 '{tv_target}' 2>/dev/null")
-    existing_on_tv = set(existing_raw.splitlines()) if existing_raw else set()
+    # Obtem lista de arquivos ja existentes na TV sem overhead de stat() no FAT32
+    existing_raw = telnet_cmd(f"/bin/ls -1 '{tv_target}/' 2>/dev/null", timeout=10)
+    existing_on_tv = set(line.strip() for line in existing_raw.splitlines() if line.strip()) if existing_raw else set()
 
     to_transfer = [f for f in files if f not in existing_on_tv]
     print(f"[*] Fotos locais: {len(files)} | Ja no pendrive da TV: {len(existing_on_tv)} | Novas para transferir: {len(to_transfer)}")
 
     if not to_transfer:
         print("[OK] Todas as fotos locais ja estao presentes no pendrive da TV. Nada a transferir!")
-        # Atualiza manifesto para garantir integridade
         daemon_script = "/media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh"
-        telnet_cmd(f"sh {daemon_script} 2>/dev/null || true")
+        telnet_cmd(f"sh {daemon_script} 2>/dev/null || true", timeout=10)
         return
 
     # Inicia servidor HTTP temporario local
@@ -269,22 +351,37 @@ def send_to_tv(local_dir):
     finally:
         s.close()
 
-    print(f"[*] Transferindo {len(to_transfer)} fotos novas para o pendrive da TV...")
-    for idx, f in enumerate(to_transfer, start=1):
-        enc_name = urllib.parse.quote(f)
-        cmd = f"curl -s -f 'http://{host_ip}:{port}/{enc_name}' -o '{tv_target}/{f}'"
-        telnet_cmd(cmd)
-        if idx % 20 == 0 or idx == len(to_transfer):
-            print(f"    [{idx}/{len(to_transfer)}] fotos enviadas para o pendrive...")
+    print(f"[*] Transferindo {len(to_transfer)} fotos novas para o pendrive da TV em lotes rapidos...")
+    batch_name = ".sync_batch_tmp.tar"
+    batch_path = os.path.join(local_dir, batch_name)
+    batch_size = 50
+    try:
+        for i in range(0, len(to_transfer), batch_size):
+            chunk = to_transfer[i:i + batch_size]
+            with tarfile.open(batch_path, "w") as tar:
+                for fname in chunk:
+                    full_p = os.path.join(local_dir, fname)
+                    if os.path.isfile(full_p):
+                        tar.add(full_p, arcname=fname)
+            cmd = f"curl -s -f 'http://{host_ip}:{port}/{batch_name}' | tar -xf - -C '{tv_target}'"
+            telnet_cmd(cmd, timeout=25)
+            sent = min(i + batch_size, len(to_transfer))
+            print(f"    [{sent}/{len(to_transfer)}] fotos enviadas para o pendrive...")
+    finally:
+        if os.path.exists(batch_path):
+            try:
+                os.remove(batch_path)
+            except Exception:
+                pass
+        httpd.shutdown()
 
-    httpd.shutdown()
     print("[*] Transferencia concluida com sucesso!")
-    
+
     # Atualiza o catalogo e manifesto do Launcher na TV
     print("[*] Reconstruindo catalogo personal_manifest.json na TV...")
     daemon_script = "/media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh"
-    telnet_cmd(f"sh {daemon_script} 2>/dev/null || true")
-    
+    telnet_cmd(f"sh {daemon_script} 2>/dev/null || true", timeout=10)
+
     total_now = check_pendrive_photo_count()
     print(f"[SUCCESS] Concluido! Total atual de fotos no pendrive da TV: {total_now}")
 
@@ -322,6 +419,7 @@ def main():
     parser.add_argument("--source", help="Pasta local com fotos ja existentes para enviar para a TV")
     parser.add_argument("--limit", type=int, default=100, help="Limite de fotos para sincronizar (padrao: 100, use 0 para todas as fotos do album)")
     parser.add_argument("--tv", action="store_true", help="Envia automaticamente as fotos baixadas para o pendrive conectado na TV via rede")
+    parser.add_argument("--optimize-local", action="store_true", help="Re-comprime e otimiza as fotos ja existentes na pasta de destino")
     parser.add_argument("--info", action="store_true", help="Exibe informacoes de contagem de fotos no album e no pendrive sem baixar nada")
 
     args = parser.parse_args()
@@ -331,6 +429,11 @@ def main():
         return
 
     dest_folder = os.path.abspath(args.dest)
+    if args.optimize_local:
+        optimize_local_folder(dest_folder)
+        if args.tv:
+            send_to_tv(dest_folder)
+        return
     if args.album_url:
         sync_album(args.album_url, dest_folder, limit=args.limit)
         if args.tv:

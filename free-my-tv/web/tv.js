@@ -484,8 +484,11 @@ var TV = (function () {
       var cmd = '';
       if (!appId || appId === 'com.webos.app.livetv') {
         cmd = 'rm -f /var/lib/webosbrew/power_on_app';
+      } else if (/^[a-zA-Z0-9._-]+$/.test(appId)) {
+        cmd = 'printf "%s" "' + appId + '" > /var/lib/webosbrew/power_on_app';
       } else {
-        cmd = 'echo -n "' + appId + '" > /var/lib/webosbrew/power_on_app';
+        if (done) setTimeout(function () { done(false); }, 0);
+        return;
       }
       luna('luna://org.webosbrew.hbchannel.service/exec', {command: cmd}, function (res) {
         if (done) done(!!res);
