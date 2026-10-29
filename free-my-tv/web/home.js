@@ -549,7 +549,7 @@
     }
   }
 
-  function updateFocus() {
+  function updateFocus(fromHover) {
     var i, list;
     list = $('tabs').children;
     for (i = 0; i < list.length; i++) {
@@ -569,20 +569,23 @@
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.DRAWER && st.drawer === i);
     list = document.querySelectorAll('#apps .cell');
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.APPS && st.grid === i);
-    var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), first = Math.max(0, Math.min(rows - 3, r - 1));
-    $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
-    focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
-    focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
-    focusRows($('langpick'), st.lang, st.zone === Z.LANG);
+    if (!fromHover) {
+      var rows = Math.max(1, Math.ceil(others.length / 5)), r = Math.floor(st.grid / 5), first = Math.max(0, Math.min(rows - 3, r - 1));
+      $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
+    }
+    focusRows($('settings'), st.row, st.zone === Z.SETTINGS, fromHover);
+    focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT, fromHover);
+    focusRows($('langpick'), st.lang, st.zone === Z.LANG, fromHover);
     if (langHint) langHint.textContent = (st.lang + 1) + ' / ' + languageChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
-    focusRows($('poweronpick'), st.poweron, st.zone === Z.POWERON);
+    focusRows($('poweronpick'), st.poweron, st.zone === Z.POWERON, fromHover);
     if (poweronHint) poweronHint.textContent = (st.poweron + 1) + ' / ' + powerOnChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
   }
 
-  function focusRows(sheet, index, on) {
+  function focusRows(sheet, index, on, fromHover) {
     var rows = sheet.querySelectorAll('.row');
     for (var i = 0; i < rows.length; i++) setClass(rows[i], 'focus', on && i === index);
+    if (fromHover) return;
     var holder = sheet.querySelector('.rows');
     if (!holder) return;
     var visible = 7, first = Math.max(0, Math.min(rows.length - visible, index - 3));
@@ -1140,7 +1143,10 @@
     updateFocus();
   }
 
+  var lastZoneSwitchAt = 0;
+
   function closeSheets() {
+    lastZoneSwitchAt = Date.now();
     editRows = null;
     setClass($('apps'), 'open', false);
     setClass($('settings'), 'open', false);
@@ -1163,9 +1169,9 @@
         step: function (d) { if (d >= 0) openLanguages(); }},
       {label: tr('Power On App') || 'Ao ligar a TV', value: powerOnAppLabel(), opens: true, poweron: true,
         step: function (d) { if (d >= 0) openPowerOnPicker(); }},
-      {label: 'Plano de Fundo e Descanso', value: wallpaperModeLabel(), opens: true, wallpaper: true,
+      {label: 'Plano de Fundo e Descanso', value: wallpaperModeLabel(), wallpaper: true,
         step: function (d) { cycleWallpaperMode(d); }},
-      {label: 'Saída de Áudio', value: audioOutputName(currentAudioMode), opens: true, audio: true,
+      {label: 'Saída de Áudio', value: audioOutputName(currentAudioMode), audio: true,
         step: function (d) { cycleAudioOutput(d); }},
       {label: tr('Temperature'), value: unit === 'C' ? '°C' : unit === 'F' ? '°F' : tr('unit|Automatic'),
         step: function (d) { cycle('temperature', ['auto', 'C', 'F'], unit, d); renderPanels(); }},
@@ -1185,11 +1191,12 @@
     var count = Data.currency === 'BRL' ? 4 : 3;
     for (var i = 0; i < count; i++) {
       (function (i) {
-        rows.push({label: names[i], toggle: Prefs.quotes() && Prefs.coin(i), dim: !Prefs.quotes(),
-          step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
+        var coinOn = Boolean(Prefs.quotes() && (!Prefs.coin || Prefs.coin(i)));
+        rows.push({label: names[i], toggle: coinOn, dim: !Prefs.quotes(),
+          step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !(!Prefs.coin || Prefs.coin(i))); Data.settingsChanged(); } }});
       })(i);
     }
-    rows.push({label: tr('Shelf'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
+    rows.push({label: tr('Shelf'), value: '›', shelf: true, step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('TV Settings'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     return rows;
   }
@@ -1225,9 +1232,16 @@
     updateFocus();
   }
 
-  function openSettings() {
+  function openSettings(keepRow) {
+    lastZoneSwitchAt = Date.now();
+    setClass($('apps'), 'open', false);
+    setClass($('shelfedit'), 'open', false);
+    setClass($('langpick'), 'open', false);
+    setClass($('poweronpick'), 'open', false);
+    langHint = null;
+    poweronHint = null;
     st.zone = Z.SETTINGS;
-    st.row = 0;
+    if (!keepRow) st.row = 0;
     renderSettings();
     setClass($('settings'), 'open', true);
     updateFocus();
@@ -1249,7 +1263,9 @@
   function renderLanguages() {
     var box = $('langpick').firstChild, choices = languageChoices(), current = choices.indexOf(pickedLanguage());
     box.innerHTML = '';
-    el('div', 'title', box, tr('Language'));
+    var title = el('div', 'title', box, '‹  ' + tr('Language'));
+    title.style.cursor = 'pointer';
+    title.onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); closeLanguages(false); };
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     list.style.height = Math.min(choices.length, 7) * 78 + 'px';
     for (var i = 0; i < choices.length; i++) {
@@ -1262,6 +1278,7 @@
   }
 
   function openLanguages() {
+    lastZoneSwitchAt = Date.now();
     setClass($('settings'), 'open', false);
     st.zone = Z.LANG;
     st.lang = Math.max(0, languageChoices().indexOf(pickedLanguage()));
@@ -1272,16 +1289,17 @@
 
   /** OK: the language under the focus; Back: none. Either way, back to Home Settings, on the Language row. */
   function closeLanguages(pick) {
+    lastZoneSwitchAt = Date.now();
     setClass($('langpick'), 'open', false);
     langHint = null;
     var code = languageChoices()[st.lang];
-    if (pick && code !== pickedLanguage()) {
+    if (pick && code && code !== pickedLanguage()) {
       Prefs.set('language', code);
       I18N.set(Prefs.language());
       renderAll();
       Data.refresh();   // the picks' titles and genres come in the new language
     }
-    openSettings();
+    openSettings(true);
     for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].language) st.row = i;
     updateFocus();
   }
@@ -1325,7 +1343,9 @@
   function renderPowerOn() {
     var box = $('poweronpick').firstChild, choices = powerOnChoices(), currentId = Prefs.powerOnApp();
     box.innerHTML = '';
-    el('div', 'title', box, tr('Power On App') || 'Ao ligar a TV');
+    var title = el('div', 'title', box, '‹  ' + (tr('Power On App') || 'Ao ligar a TV'));
+    title.style.cursor = 'pointer';
+    title.onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); closePowerOnPicker(false); };
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     list.style.height = Math.min(choices.length, 7) * 78 + 'px';
     for (var i = 0; i < choices.length; i++) {
@@ -1338,6 +1358,7 @@
   }
 
   function openPowerOnPicker() {
+    lastZoneSwitchAt = Date.now();
     setClass($('settings'), 'open', false);
     st.zone = Z.POWERON;
     var choices = powerOnChoices(), cur = Prefs.powerOnApp(), idx = 0;
@@ -1351,6 +1372,7 @@
   }
 
   function closePowerOnPicker(pick) {
+    lastZoneSwitchAt = Date.now();
     setClass($('poweronpick'), 'open', false);
     poweronHint = null;
     var choices = powerOnChoices();
@@ -1359,7 +1381,7 @@
       Prefs.set('powerOnApp', choice.id);
       TV.setPowerOnApp(choice.id);
     }
-    openSettings();
+    openSettings(true);
     for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].poweron) st.row = i;
     updateFocus();
   }
@@ -1369,6 +1391,7 @@
   var editRows = null;
 
   function openShelfEdit() {
+    lastZoneSwitchAt = Date.now();
     setClass($('settings'), 'open', false);
     st.zone = Z.EDIT;
     st.edit = 0;
@@ -1394,8 +1417,10 @@
     var box = $('shelfedit').firstChild;
     box.innerHTML = '';
     var title = el('div', 'title', box);
+    title.style.cursor = 'pointer';
+    title.onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); back(); };
     sym('apps', title);
-    title.appendChild(document.createTextNode(tr('Shelf')));
+    title.appendChild(document.createTextNode('‹  ' + tr('Shelf')));
     var list = el('div', 'list', box), holder = el('div', 'rows', list);
     var ids = shelf.map(function (a) { return a.id; });
     var rows = editRows || apps;
@@ -1475,6 +1500,7 @@
   }
 
   function activate() {
+    if (Date.now() - lastZoneSwitchAt < 300) return;
     switch (st.zone) {
       case Z.TOP:
         if (st.top < 3) return;
@@ -1553,8 +1579,6 @@
           var r = rowsNow[st.row];
           if (dx > 0 && (r.opens || r.value === '›')) {
             r.step(1);
-          } else if (dx < 0 && (r.opens || r.value === '›')) {
-            closeSheets();
           } else if (!r.opens && r.value !== '›') {
             r.step(dx);
             if (st.zone === Z.SETTINGS) renderSettings();
@@ -1579,7 +1603,15 @@
   }
 
   function back() {
-    if (st.zone === Z.EDIT) { editRows = null; setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
+    if (Date.now() - lastZoneSwitchAt < 300) return;
+    if (st.zone === Z.EDIT) {
+      editRows = null;
+      setClass($('shelfedit'), 'open', false);
+      openSettings(true);
+      for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].shelf) st.row = i;
+      updateFocus();
+      return;
+    }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (st.zone === Z.POWERON) { closePowerOnPicker(false); return; }
     if (sheetOpen()) { closeSheets(); return; }
@@ -1591,7 +1623,13 @@
   /** The pointer focuses what it's over (the Magic Remote, or a mouse when previewing). */
   function hover(node, zone, index) {
     node.onmouseover = function () {
-      if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.POWERON))) return;
+      if (saverOn) return;
+      var isSheetZone = (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.POWERON);
+      if (sheetOpen()) {
+        if (st.zone !== zone) return;
+      } else if (isSheetZone) {
+        return;
+      }
       if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
@@ -1616,9 +1654,14 @@
       else if (zone === Z.EDIT) st.edit = index;
       else if (zone === Z.LANG) st.lang = index;
       else if (zone === Z.POWERON) st.poweron = index;
-      updateFocus();
+      updateFocus(true);
     };
-    node.onclick = function () { node.onmouseover(); activate(); };
+    node.onclick = function (e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (sheetOpen() && st.zone !== zone) return;
+      node.onmouseover();
+      activate();
+    };
   }
 
   // MARK: - Toast
@@ -1770,6 +1813,12 @@
     e.preventDefault();
   });
   document.addEventListener('mousemove', function () { poke(); });
+  document.addEventListener('wheel', function (e) {
+    if (poke()) return;
+    if (!sheetOpen()) return;
+    if (e.deltaY > 0) move(0, 1);
+    else if (e.deltaY < 0) move(0, -1);
+  });
 
   // MARK: - Start
 
@@ -1879,12 +1928,13 @@
   for (var shIdx = 0; shIdx < allSheets.length; shIdx++) {
     (function (sheetEl) {
       sheetEl.addEventListener('click', function (e) {
+        if (!hasClass(sheetEl, 'open')) return;
         var cur = e.target;
         while (cur && cur !== sheetEl) {
           if (hasClass(cur, 'box') || hasClass(cur, 'grid')) return;
           cur = cur.parentNode;
         }
-        back();
+        if (cur === sheetEl) back();
       });
     })(allSheets[shIdx]);
   }

@@ -57,6 +57,10 @@ var Prefs = (function () {
     /** The shelf_apps of the build that last set the shelf, so a new one wins once over the TV's choice. */
     shelfConfig: function () { return pick('shelfConfig', ''); },
     set: function (name, value) { v[name] = value; save(); this.version++; },
+    coin: function (i) {
+      var c = pick('coins', null);
+      return !c || c[i] !== false;
+    },
     setCoin: function (i, on) {
       var c = (pick('coins', null) || [true, true, true, true]).slice();
       c[i] = on;
