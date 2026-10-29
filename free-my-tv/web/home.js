@@ -625,13 +625,14 @@
     var buttons = $('buttons');
     buttons.innerHTML = '';
     var defs = [
+      ['sparkles', 'Modo Porta-Retratos'],
       ['hdmi', tr('HDMI Inputs')],
       ['speaker', 'Áudio: ' + audioOutputName(currentAudioMode)],
       ['settings', tr('light|Settings')]
     ];
-    for (var b = 0; b < 3; b++) {
-      var r = el('button', 'round' + (b === 2 ? ' last' : ''), buttons);
-      r.style.left = (1596 + 88 * b) + 'px';
+    for (var b = 0; b < 4; b++) {
+      var r = el('button', 'round' + (b === 3 ? ' last' : ''), buttons);
+      r.style.left = (1508 + 88 * b) + 'px';
       sym(defs[b][0], r);
       el('div', 'tip', r, defs[b][1]);
       hover(r, Z.TOP, 3 + b);
@@ -685,8 +686,6 @@
 
   // MARK: - Custom Wallpaper & Photo Slideshow
 
-  // MARK: - Custom Wallpaper & Photo Slideshow
-
   var WALLPAPER_CATALOG = {
     personal: [],
     curated: [
@@ -707,9 +706,9 @@
   function wallpaperModeLabel() {
     var m = Prefs.wallpaperMode();
     var count = WALLPAPER_CATALOG.personal.length;
-    if (m === 'personal') return count ? ('Fotos Pessoais (' + count + ' no USB)') : 'Fotos Pessoais (Pendrive USB)';
-    if (m === 'curated') return 'Wallpapers da TV (OLED 4K)';
-    return count ? ('Todas (' + count + ' USB + OLED)') : 'Todas (Fotos & OLED)';
+    if (m === 'personal') return count ? ('Fotos USB (' + count + ')') : 'Fotos Pessoais (USB)';
+    if (m === 'curated') return 'Wallpapers OLED 4K';
+    return count ? ('Todas (' + count + ' + OLED)') : 'Todas (Fotos & OLED)';
   }
 
   function normalizeWallpaper(item) {
@@ -768,6 +767,30 @@
   var wallFront = 'wallA';
   var wallTimer = null;
 
+  var ambiScratch = document.createElement('canvas');
+  ambiScratch.width = 16;
+  ambiScratch.height = 9;
+  var ambiScratchCtx = ambiScratch.getContext('2d');
+
+  /** Desenha um fundo Ambilight ultra-suave em um canvas 64x36 (9KB RAM, 0% shader GPU). */
+  function paintAmbilight(canvas, img, darkenAlpha) {
+    if (!canvas || !img) return;
+    var iw = img.naturalWidth || 1920, ih = img.naturalHeight || 1080;
+    var ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
+    try {
+      ambiScratchCtx.drawImage(img, 0, 0, iw, ih, 0, 0, 16, 9);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(ambiScratch, 0, 0, 16, 9, 0, 0, w, h);
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(ambiScratch, 0, 0, 16, 9, -2, -2, w + 4, h + 4);
+      ctx.globalAlpha = 0.35;
+      ctx.drawImage(ambiScratch, 0, 0, 16, 9, 2, 2, w - 4, h - 4);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(6, 8, 14, ' + (darkenAlpha !== undefined ? darkenAlpha : 0.32) + ')';
+      ctx.fillRect(0, 0, w, h);
+    } catch (e) {}
+  }
+
   function setWallpaper(url) {
     if (!url) return;
     var next = (wallFront === 'wallA') ? 'wallB' : 'wallA';
@@ -777,7 +800,23 @@
     var img = new Image();
     img.onload = function () {
       img.onload = null;
-      nextEl.style.backgroundImage = 'url("' + safeCssUrl(url) + '")';
+      var iw = img.naturalWidth || 1920, ih = img.naturalHeight || 1080;
+      var aspect = iw / ih;
+      var ambi = nextEl.querySelector('.wall-ambilight');
+      var fg = nextEl.querySelector('.wall-fg');
+      if (fg) {
+        if (aspect < 1.55 && ambi) {
+          paintAmbilight(ambi, img, 0.28);
+          ambi.style.display = 'block';
+          fg.className = 'wall-fg contain';
+        } else {
+          if (ambi) ambi.style.display = 'none';
+          fg.className = 'wall-fg full';
+        }
+        fg.style.backgroundImage = 'url("' + safeCssUrl(url) + '")';
+      } else {
+        nextEl.style.backgroundImage = 'url("' + safeCssUrl(url) + '")';
+      }
       setClass(nextEl, 'on', true);
       setClass(frontEl, 'on', false);
       wallFront = next;
@@ -909,7 +948,7 @@
   function updateAudioTip() {
     var btn = $('buttons');
     if (!btn || btn.children.length < 3) return;
-    var audioBtn = btn.children[1];
+    var audioBtn = btn.children[btn.children.length >= 4 ? 2 : 1];
     var tip = audioBtn.querySelector('.tip');
     if (tip) tip.textContent = 'Áudio: ' + audioOutputName(currentAudioMode);
   }
@@ -1204,10 +1243,12 @@
         step: function (d) { if (d >= 0) openLanguages(); }},
       {label: tr('Power On App') || 'Ao ligar a TV', value: powerOnAppLabel(), opens: true, poweron: true,
         step: function (d) { if (d >= 0) openPowerOnPicker(); }},
-      {label: 'Plano de Fundo e Descanso', value: wallpaperModeLabel(), wallpaper: true,
+      {label: 'Plano de Fundo', value: wallpaperModeLabel(), wallpaper: true,
         step: function (d) { cycleWallpaperMode(d); }},
-      {label: 'Fonte das Fotos (USB)', value: usbSourceLabel(), opens: true, usb: true,
+      {label: 'Pasta de Fotos (USB)', value: usbSourceLabel(), opens: true, usb: true,
         step: function (d) { if (d >= 0) openUsbPicker(); }},
+      {label: 'Modo Porta-Retratos', value: 'Iniciar Agora', opens: true,
+        step: function (d) { if (d >= 0) { closeSheets(); showSaver(); } }},
       {label: 'Saída de Áudio', value: audioOutputName(currentAudioMode), audio: true,
         step: function (d) { cycleAudioOutput(d); }},
       {label: tr('Temperature'), value: unit === 'C' ? '°C' : unit === 'F' ? '°F' : tr('unit|Automatic'),
@@ -1640,8 +1681,9 @@
     switch (st.zone) {
       case Z.TOP:
         if (st.top < 3) return;
-        if (st.top === 3) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
-        else if (st.top === 4) { cycleAudioOutput(); }
+        if (st.top === 3) { showSaver(); }
+        else if (st.top === 4) { st.zone = Z.SHELF; openDrawer(); st.drawer = 1 < drawerInputs ? 1 : 0; updateFocus(); }
+        else if (st.top === 5) { cycleAudioOutput(); }
         else openSettings();
         return;
       case Z.CARDS:
@@ -1699,7 +1741,7 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(3, Math.min(5, st.top + dx));
+          st.top = Math.max(3, Math.min(6, st.top + dx));
         } else if (dy > 0) {
           st.zone = Z.SHELF;
         }
@@ -1837,6 +1879,12 @@
   var saverOn = false, idleAt = Date.now(), saverTimer = 0, SAVER_AFTER = 5 * 60000;
   var saverDeck = [];
   var lastSaverUrl = '';
+  var saverHistory = [];
+  var saverHistIdx = -1;
+  var saverPaused = false;
+  var saverHudHidden = false;
+  var saverCtrlTimer = 0;
+  var saverStepFn = null, saverPauseFn = null, saverHudFn = null;
 
   /** The screensaver's photos: picks with an app on the TV. */
   function saverPhotos() {
@@ -1869,16 +1917,21 @@
     var list = getActiveWallpapers();
     if (!list || !list.length) return;
     saverOn = true;
+    saverPaused = false;
+    saverHistory = [];
+    saverHistIdx = -1;
     stopLivePreview();
     var s = $('saver');
     s.innerHTML = '';
     var a = createSaverPhoto(s), b = createSaverPhoto(s);
-    el('div', 'shade', s);
-    var clock = el('div', 'clock', s);
+    var shade = el('div', 'shade' + (saverHudHidden ? ' hud-hidden' : ''), s);
+    var clock = el('div', 'clock' + (saverHudHidden ? ' hud-hidden' : ''), s);
     el('div', 'time', clock);
     el('div', 'date', clock);
     el('div', 'title', clock);
+    var ctrls = el('div', 'saver-controls', s, '◀ ▶ Navegar  ·  OK Pausar  ·  ▲▼ Relógio  ·  Voltar Sair');
     var front = a;
+    var currentTitle = 'Galeria Pessoal';
 
     // Sempre inicia o repouso com um novo baralho aleatório
     saverDeck = shuffle(list);
@@ -1889,34 +1942,145 @@
       saverDeck[swapIdx] = tmp;
     }
 
-    function next() {
-      if (!saverOn) return;
-      var p = nextSaverPhoto(list);
-      var back = front === a ? b : a;
-      if (p && p.url) {
-        var pre = new Image();
-        pre.onload = function () {
-          pre.onload = null;
-          if (!saverOn) return;
-          back.fg.style.backgroundImage = 'url("' + safeCssUrl(p.url) + '")';
-          clock.lastChild.textContent = formatSaverTitle(p.title);
-          setClass(back.el, 'on', true);
-          setClass(front.el, 'on', false);
-          front = back;
-        };
-        pre.src = p.url;
+    function flashControls(customText) {
+      if (!ctrls) return;
+      ctrls.textContent = customText || (saverPaused
+        ? '❚❚ Pausado  ·  OK Retomar  ·  ◀ ▶ Navegar  ·  Voltar Sair'
+        : '◀ ▶ Navegar  ·  OK Pausar  ·  ▲▼ Relógio  ·  Voltar Sair');
+      setClass(ctrls, 'on', true);
+      clearTimeout(saverCtrlTimer);
+      if (!saverPaused) {
+        saverCtrlTimer = setTimeout(function () { setClass(ctrls, 'on', false); }, 5500);
       }
-      tickSaverClock(clock);
-      saverTimer = setTimeout(next, 10000);
     }
+
+    function updateClockSubtitle() {
+      if (!clock || !clock.lastChild) return;
+      var status = saverPaused ? '  ·  ❚❚ Pausado' : '';
+      clock.lastChild.textContent = currentTitle + status;
+    }
+
+    function showPick(p) {
+      if (!saverOn || !p || !p.url) return;
+      var back = front === a ? b : a;
+      var pre = new Image();
+      pre.onload = function () {
+        pre.onload = pre.onerror = null;
+        if (!saverOn) return;
+        var iw = pre.naturalWidth || 1920, ih = pre.naturalHeight || 1080;
+        var aspect = iw / ih;
+        if (aspect >= 1.62) {
+          back.ambi.style.display = 'none';
+          back.vignette.style.display = 'none';
+          back.fg.className = 'fg full';
+          back.fg.style.left = '0px';
+          back.fg.style.top = '0px';
+          back.fg.style.width = '1920px';
+          back.fg.style.height = '1080px';
+        } else {
+          paintAmbilight(back.ambi, pre, 0.28);
+          back.ambi.style.display = 'block';
+          back.vignette.style.display = 'block';
+          var maxW = 1780, maxH = 984;
+          var fw = Math.round(maxH * aspect), fh = maxH;
+          if (fw > maxW) {
+            fw = maxW;
+            fh = Math.round(maxW / aspect);
+          }
+          var fx = Math.round((1920 - fw) / 2);
+          var fy = Math.round((1080 - fh) / 2);
+          back.fg.className = 'fg framed';
+          back.fg.style.left = fx + 'px';
+          back.fg.style.top = fy + 'px';
+          back.fg.style.width = fw + 'px';
+          back.fg.style.height = fh + 'px';
+        }
+        back.fg.style.backgroundImage = 'url("' + safeCssUrl(p.url) + '")';
+        currentTitle = formatSaverTitle(p.title);
+        updateClockSubtitle();
+        setClass(back.el, 'on', true);
+        setClass(front.el, 'on', false);
+        front = back;
+      };
+      pre.onerror = function () {
+        pre.onload = pre.onerror = null;
+        if (saverOn && !saverPaused) {
+          clearTimeout(saverTimer);
+          saverTimer = setTimeout(function () { step(1); }, 300);
+        }
+      };
+      pre.src = p.url;
+    }
+
+    function scheduleNext() {
+      clearTimeout(saverTimer);
+      if (!saverPaused && saverOn) {
+        saverTimer = setTimeout(function () { step(1); }, 12000);
+      }
+    }
+
+    function step(dir) {
+      if (!saverOn) return;
+      var p = null;
+      if (dir < 0) {
+        if (saverHistIdx > 0) {
+          saverHistIdx--;
+          p = saverHistory[saverHistIdx];
+        } else if (saverHistory.length) {
+          p = saverHistory[0];
+        }
+      } else {
+        if (saverHistIdx < saverHistory.length - 1) {
+          saverHistIdx++;
+          p = saverHistory[saverHistIdx];
+        } else {
+          p = nextSaverPhoto(list);
+          if (p) {
+            saverHistory.push(p);
+            if (saverHistory.length > 40) saverHistory.shift();
+            saverHistIdx = saverHistory.length - 1;
+          }
+        }
+      }
+      if (p) showPick(p);
+      tickSaverClock(clock);
+      scheduleNext();
+    }
+
+    saverStepFn = function (dir) {
+      step(dir);
+      flashControls();
+    };
+    saverPauseFn = function () {
+      saverPaused = !saverPaused;
+      updateClockSubtitle();
+      scheduleNext();
+      flashControls();
+    };
+    saverHudFn = function () {
+      saverHudHidden = !saverHudHidden;
+      setClass(clock, 'hud-hidden', saverHudHidden);
+      setClass(shade, 'hud-hidden', saverHudHidden);
+      flashControls(saverHudHidden ? 'Relógio oculto  ·  ▲▼ Exibir  ·  Voltar Sair' : null);
+    };
+    s.onclick = function (e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (saverPauseFn) saverPauseFn();
+    };
+
     setClass(s, 'on', true);
-    next();
+    flashControls();
+    step(1);
   }
 
   function createSaverPhoto(parent) {
     var p = el('div', 'photo', parent);
+    var ambi = el('canvas', 'ambilight', p);
+    ambi.width = 64;
+    ambi.height = 36;
+    var vignette = el('div', 'ambi-vignette', p);
     var fg = el('div', 'fg', p);
-    return { el: p, fg: fg };
+    return { el: p, ambi: ambi, vignette: vignette, fg: fg };
   }
 
   function tickSaverClock(clock) {
@@ -1929,7 +2093,10 @@
   function hideSaver() {
     if (!saverOn) return;
     saverOn = false;
+    saverPaused = false;
+    saverStepFn = saverPauseFn = saverHudFn = null;
     clearTimeout(saverTimer);
+    clearTimeout(saverCtrlTimer);
     var s = $('saver');
     setClass(s, 'on', false);
     setTimeout(function () {
@@ -1948,7 +2115,16 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
-    if (poke()) { e.preventDefault(); return; }   // the first press only wakes the screen
+    idleAt = Date.now();
+    if (saverOn) {
+      if (k === TV.keys.right) { if (saverStepFn) saverStepFn(1); }
+      else if (k === TV.keys.left) { if (saverStepFn) saverStepFn(-1); }
+      else if (k === TV.keys.ok || k === 415 || k === 19 || k === 32) { if (saverPauseFn) saverPauseFn(); }
+      else if (k === TV.keys.up || k === TV.keys.down) { if (saverHudFn) saverHudFn(); }
+      else { hideSaver(); }
+      e.preventDefault();
+      return;
+    }
     if (k === TV.keys.left) move(-1, 0);
     else if (k === TV.keys.right) move(1, 0);
     else if (k === TV.keys.up) move(0, -1);
@@ -1958,9 +2134,16 @@
     else return;
     e.preventDefault();
   });
-  document.addEventListener('mousemove', function () { poke(); });
+  document.addEventListener('mousemove', function () {
+    idleAt = Date.now();
+  });
   document.addEventListener('wheel', function (e) {
-    if (poke()) return;
+    idleAt = Date.now();
+    if (saverOn) {
+      if (e.deltaY > 0 && saverStepFn) saverStepFn(1);
+      else if (e.deltaY < 0 && saverStepFn) saverStepFn(-1);
+      return;
+    }
     if (!sheetOpen()) return;
     if (e.deltaY > 0) move(0, 1);
     else if (e.deltaY < 0) move(0, -1);

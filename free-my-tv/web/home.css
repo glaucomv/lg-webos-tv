@@ -81,13 +81,32 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center center;
+  overflow: hidden;
   opacity: 0;
   -webkit-transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
   transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .wall-pane.on { opacity: 1; }
+.wall-ambilight {
+  position: absolute;
+  left: -2%;
+  top: -2%;
+  width: 104%;
+  height: 104%;
+  display: none;
+}
+.wall-fg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+.wall-fg.full { background-size: cover; }
+.wall-fg.contain { background-size: contain; }
 .wall-mask {
   position: absolute;
   left: 0;
@@ -792,9 +811,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 #settings .box, #shelfedit .box, #langpick .box, #poweronpick .box, #usbpick .box {
   position: absolute;
-  left: 560px;
-  top: 150px;
-  width: 800px;
+  left: 470px;
+  top: 140px;
+  width: 980px;
   border-radius: 40px;
   padding: 30px 30px 26px;
   box-sizing: border-box;
@@ -806,10 +825,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .box .title .sym { width: 36px; height: 36px; vertical-align: -5px; margin-right: 14px; color: rgba(255, 255, 255, 0.85); }
 .box .list { position: relative; overflow: hidden; }
 .box .rows { -webkit-transition: -webkit-transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1); transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1); }
-.box .row { position: relative; height: 70px; margin-bottom: 8px; border-radius: 20px; font-size: 30px; font-weight: 600; line-height: 70px; padding: 0 24px; white-space: nowrap; -webkit-transition: background-color 0.13s; transition: background-color 0.13s; }
+.box .row { position: relative; height: 70px; margin-bottom: 8px; border-radius: 20px; font-size: 27px; font-weight: 600; line-height: 70px; padding: 0 24px; white-space: nowrap; overflow: hidden; -webkit-transition: background-color 0.13s; transition: background-color 0.13s; }
 .box .row.focus { background: rgba(255, 255, 255, 0.13); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
-.box .row .value { position: absolute; right: 24px; top: 0; color: rgba(255, 255, 255, 0.92); font-weight: 500; }
-.box .row .value .chev { color: rgba(255, 255, 255, 0.35); margin: 0 10px; }
+.box .row .value { position: absolute; right: 24px; top: 0; max-width: 52%; overflow: hidden; text-overflow: ellipsis; font-size: 25px; color: rgba(255, 255, 255, 0.92); font-weight: 500; text-align: right; }
+.box .row .value .chev { color: rgba(255, 255, 255, 0.35); margin: 0 8px; }
 .box .row .value .sym { width: 26px; height: 26px; vertical-align: -3px; }
 .box .row.dim { color: rgba(255, 255, 255, 0.4); }
 .box .hint { padding: 14px 18px 0; font-size: 22px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
@@ -818,7 +837,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .toggle.on { background: #3FD69B; }
 .toggle.on::after { -webkit-transform: translateX(34px); transform: translateX(34px); }
 
-/* MARK: - Screensaver: the picks' photos, slowly moving, and a clock */
+/* MARK: - Screensaver: Living-room Ambilight Photo Frame & Ken Burns */
 
 #saver { background: #000; opacity: 0; visibility: hidden; -webkit-transition: opacity 1.2s, visibility 0s 1.2s; transition: opacity 1.2s, visibility 0s 1.2s; }
 #saver.on { opacity: 1; visibility: visible; -webkit-transition-delay: 0s; transition-delay: 0s; }
@@ -832,9 +851,27 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: opacity 1.5s ease-in-out;
   transition: opacity 1.5s ease-in-out;
   overflow: hidden;
-  background: #000;
+  background: #05060A;
 }
 #saver .photo.on { opacity: 1; }
+#saver .photo .ambilight {
+  position: absolute;
+  left: -3%;
+  top: -3%;
+  width: 106%;
+  height: 106%;
+  display: none;
+}
+#saver .photo .ambi-vignette {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.04) 28%, rgba(3, 4, 8, 0.58) 100%);
+  pointer-events: none;
+  display: none;
+}
 #saver .photo .fg {
   position: absolute;
   left: 0;
@@ -844,6 +881,24 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
+  -webkit-transform: scale(0.968) translateZ(0);
+  transform: scale(0.968) translateZ(0);
+  -webkit-transition: -webkit-transform 12s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: transform 12s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+#saver .photo.on .fg {
+  -webkit-transform: scale(1.018) translateZ(0);
+  transform: scale(1.018) translateZ(0);
+}
+#saver .photo .fg.full {
+  background-size: cover;
+  border-radius: 0;
+  box-shadow: none;
+}
+#saver .photo .fg.framed {
+  background-size: 100% 100%;
+  border-radius: 24px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.82), 0 0 0 1.5px rgba(255, 255, 255, 0.24);
 }
 
 .tile, .card, .cell {
@@ -851,22 +906,42 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
 }
-#saver .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 520px; background: -webkit-linear-gradient(top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.55)); background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.55)); }
+#saver .shade { position: absolute; left: 0; right: 0; bottom: 0; height: 340px; background: -webkit-linear-gradient(top, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.48)); background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.48)); pointer-events: none; -webkit-transition: opacity 0.4s; transition: opacity 0.4s; }
 #saver .clock {
   position: absolute;
-  left: 80px;
-  bottom: 90px;
-  padding: 26px 46px 30px;
-  border-radius: 46px;
+  left: 56px;
+  bottom: 48px;
+  padding: 20px 34px 22px;
+  border-radius: 34px;
   color: #FFF;
-  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
-  background: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  background: -webkit-linear-gradient(top, rgba(20, 22, 28, 0.68), rgba(10, 12, 16, 0.78));
+  background: linear-gradient(rgba(20, 22, 28, 0.68), rgba(10, 12, 16, 0.78));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
   white-space: nowrap;
+  -webkit-transition: opacity 0.4s;
+  transition: opacity 0.4s;
 }
-#saver .clock .time { font-size: 150px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; font-feature-settings: 'tnum'; }
-#saver .clock .date { margin-top: 10px; font-size: 34px; font-weight: 500; color: rgba(255, 255, 255, 0.82); }
-#saver .clock .title { margin-top: 18px; font-size: 26px; font-weight: 500; color: rgba(255, 255, 255, 0.65); }
+#saver .clock.hud-hidden, #saver .shade.hud-hidden { opacity: 0; }
+#saver .clock .time { font-size: 74px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; font-feature-settings: 'tnum'; }
+#saver .clock .date { margin-top: 8px; font-size: 24px; font-weight: 500; color: rgba(255, 255, 255, 0.86); text-transform: capitalize; }
+#saver .clock .title { margin-top: 10px; font-size: 20px; font-weight: 500; color: rgba(255, 255, 255, 0.68); }
+#saver .saver-controls {
+  position: absolute;
+  right: 56px;
+  bottom: 48px;
+  padding: 14px 26px;
+  border-radius: 26px;
+  font-size: 20px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(14, 16, 22, 0.72);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  opacity: 0;
+  -webkit-transition: opacity 0.45s;
+  transition: opacity 0.45s;
+  pointer-events: none;
+}
+#saver .saver-controls.on { opacity: 1; }
 
 /* MARK: - Toast */
 
