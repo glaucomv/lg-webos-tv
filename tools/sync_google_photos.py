@@ -380,7 +380,7 @@ def send_to_tv(local_dir):
     # Atualiza o catalogo e manifesto do Launcher na TV
     print("[*] Reconstruindo catalogo personal_manifest.json na TV...")
     daemon_script = "/media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh"
-    telnet_cmd(f"sh {daemon_script} 2>/dev/null || true", timeout=10)
+    telnet_cmd(f"sh {daemon_script} --rescan 2>/dev/null || true", timeout=20)
 
     total_now = check_pendrive_photo_count()
     print(f"[SUCCESS] Concluido! Total atual de fotos no pendrive da TV: {total_now}")

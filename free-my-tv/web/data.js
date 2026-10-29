@@ -50,6 +50,7 @@ var Prefs = (function () {
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', false); },
     wallpaperMode: function () { return pick('wallpaperMode', 'all'); },
+    usbPhotosDir: function () { return pick('usbPhotosDir', 'auto'); },
     soundOutput: function () { return pick('soundOutput', 'external_optical'); },
     quotes: function () { return pick('quotes', false); },
     powerOnApp: function () { return pick('powerOnApp', 'com.webos.app.livetv'); },

@@ -51,17 +51,8 @@ def deploy():
     inst_res = telnet_cmd("luna-send -n 1 luna://com.webos.appInstallService/dev/install '{\"id\":\"io.freemytv\",\"ipkUrl\":\"/tmp/freemytv.ipk\",\"subscribe\":false}'", timeout=15)
     print("TV install result:", inst_res)
 
-    print("Waiting for webOS package extraction lock to release and launching Free My TV...")
-    for attempt in range(1, 7):
-        time.sleep(2)
-        launch_res = telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"io.freemytv\"}'")
-        if '"returnValue":true' in launch_res or 'app is locked' not in launch_res:
-            print(f"TV launch result (attempt {attempt}):", launch_res)
-            break
-        print(f"  App still unlocking (attempt {attempt})...")
-
-    # Clean up temporary IPK from /tmp (RAM)
-    telnet_cmd("rm -f /tmp/freemytv.ipk")
+    print("Waiting for webOS package extraction to complete...")
+    time.sleep(2.5)
 
     daemon_src = os.path.join(ROOT_DIR, "daemon", "15-sync-usb-photos.sh")
     if os.path.exists(daemon_src):
@@ -70,7 +61,19 @@ def deploy():
         print("Syncing USB photo manifest on TV...")
         telnet_cmd("mkdir -p /media/developer/apps/usr/palm/applications/io.freemytv/daemon")
         telnet_cmd(f"cat << 'EOF' > /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh\n{d_content}\nEOF\nchmod +x /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh", timeout=8)
-        telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true", timeout=12)
+        telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true", timeout=20)
+
+    print("Launching Free My TV...")
+    for attempt in range(1, 7):
+        launch_res = telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"io.freemytv\"}'")
+        if '"returnValue":true' in launch_res or 'app is locked' not in launch_res:
+            print(f"TV launch result (attempt {attempt}):", launch_res)
+            break
+        print(f"  App still unlocking (attempt {attempt})...")
+        time.sleep(2)
+
+    # Clean up temporary IPK from /tmp (RAM)
+    telnet_cmd("rm -f /tmp/freemytv.ipk")
 
     server.shutdown()
     print("Deployment finished successfully!")

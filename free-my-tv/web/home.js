@@ -331,11 +331,11 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', POWERON: 'poweron'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, poweron: 0};
+  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', POWERON: 'poweron', USB: 'usb'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, poweron: 0, usb: 0};
   var cards = [];
 
-  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.POWERON; }
+  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.POWERON || st.zone === Z.USB; }
 
   var APP_INFO = {
     'com.webos.app.livetv': {
@@ -579,6 +579,8 @@
     if (langHint) langHint.textContent = (st.lang + 1) + ' / ' + languageChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
     focusRows($('poweronpick'), st.poweron, st.zone === Z.POWERON, fromHover);
     if (poweronHint) poweronHint.textContent = (st.poweron + 1) + ' / ' + powerOnChoices().length + '  ·  ' + tr('OK picks, Back cancels.');
+    focusRows($('usbpick'), st.usb, st.zone === Z.USB, fromHover);
+    if (usbHint) usbHint.textContent = (st.usb + 1) + ' / ' + usbChoices.length + '  ·  ' + tr('OK picks, Back cancels.');
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
   }
 
@@ -686,10 +688,7 @@
   // MARK: - Custom Wallpaper & Photo Slideshow
 
   var WALLPAPER_CATALOG = {
-    personal: [
-      {url: 'wallpapers/photo_praia.jpg', title: 'Férias na Praia (Fotos Pessoais)'},
-      {url: 'wallpapers/photo_montanha.jpg', title: 'Piquenique na Montanha (Fotos Pessoais)'}
-    ],
+    personal: [],
     curated: [
       {url: 'wallpapers/aurora.jpg', title: 'Aurora Boreal Nórdica (OLED 4K)'},
       {url: 'wallpapers/sunset.jpg', title: 'Pôr do Sol Dourado (OLED 4K)'}
@@ -698,16 +697,19 @@
 
   function getActiveWallpapers() {
     var mode = Prefs.wallpaperMode();
-    if (mode === 'personal') return WALLPAPER_CATALOG.personal;
+    if (mode === 'personal') {
+      return WALLPAPER_CATALOG.personal.length ? WALLPAPER_CATALOG.personal : WALLPAPER_CATALOG.curated;
+    }
     if (mode === 'curated') return WALLPAPER_CATALOG.curated;
     return WALLPAPER_CATALOG.curated.concat(WALLPAPER_CATALOG.personal);
   }
 
   function wallpaperModeLabel() {
     var m = Prefs.wallpaperMode();
-    if (m === 'personal') return 'Opção A: Fotos Pessoais';
-    if (m === 'curated') return 'Opção C: OLED Wallpapers';
-    return 'Todas (Fotos & OLED)';
+    var count = WALLPAPER_CATALOG.personal.length;
+    if (m === 'personal') return count ? ('Fotos Pessoais (' + count + ' no USB)') : 'Fotos Pessoais (Pendrive USB)';
+    if (m === 'curated') return 'Wallpapers da TV (OLED 4K)';
+    return count ? ('Todas (' + count + ' USB + OLED)') : 'Todas (Fotos & OLED)';
   }
 
   function normalizeWallpaper(item) {
@@ -803,26 +805,57 @@
     }
   }
 
-  function loadPersonalManifest() {
+  function loadPersonalManifest(done, retried) {
     try {
       var xhr = new XMLHttpRequest();
       xhr.open('GET', 'wallpapers/personal_manifest.json?t=' + Date.now(), true);
-      xhr.timeout = 3000;
+      xhr.timeout = 4000;
       xhr.onload = function () {
+        var loadedCount = 0;
         if (xhr.status === 200 || xhr.status === 0) {
           try {
             var data = JSON.parse(xhr.responseText);
-            if (Array.isArray(data) && data.length > 0) {
-              WALLPAPER_CATALOG.personal = data;
-              wallDeck = [];
-              saverDeck = [];
-              nextWallpaper();
+            if (Array.isArray(data)) {
+              var filtered = [];
+              for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                var u = typeof item === 'string' ? item : (item && item.url ? item.url : '');
+                if (u && u.indexOf('photo_praia.jpg') < 0 && u.indexOf('photo_montanha.jpg') < 0) {
+                  filtered.push(item);
+                }
+              }
+              if (filtered.length > 0) {
+                WALLPAPER_CATALOG.personal = filtered;
+                loadedCount = filtered.length;
+                wallDeck = [];
+                saverDeck = [];
+                nextWallpaper();
+                if (st.zone === Z.SETTINGS) renderSettings();
+              }
             }
           } catch (e) {}
         }
+        if (loadedCount === 0 && !retried) {
+          TV.syncUsbPhotos(Prefs.usbPhotosDir(), false, function () {
+            loadPersonalManifest(done, true);
+          });
+          return;
+        }
+        if (done) done(loadedCount);
+      };
+      xhr.onerror = xhr.ontimeout = function () {
+        if (!retried) {
+          TV.syncUsbPhotos(Prefs.usbPhotosDir(), false, function () {
+            loadPersonalManifest(done, true);
+          });
+          return;
+        }
+        if (done) done(0);
       };
       xhr.send();
-    } catch (e) {}
+    } catch (e) {
+      if (done) done(0);
+    }
   }
 
   function startWallpaperTimer() {
@@ -1153,8 +1186,10 @@
     setClass($('shelfedit'), 'open', false);
     setClass($('langpick'), 'open', false);
     setClass($('poweronpick'), 'open', false);
+    setClass($('usbpick'), 'open', false);
     langHint = null;
     poweronHint = null;
+    usbHint = null;
     st.zone = Z.SHELF;
     updateFocus();
   }
@@ -1171,6 +1206,8 @@
         step: function (d) { if (d >= 0) openPowerOnPicker(); }},
       {label: 'Plano de Fundo e Descanso', value: wallpaperModeLabel(), wallpaper: true,
         step: function (d) { cycleWallpaperMode(d); }},
+      {label: 'Fonte das Fotos (USB)', value: usbSourceLabel(), opens: true, usb: true,
+        step: function (d) { if (d >= 0) openUsbPicker(); }},
       {label: 'Saída de Áudio', value: audioOutputName(currentAudioMode), audio: true,
         step: function (d) { cycleAudioOutput(d); }},
       {label: tr('Temperature'), value: unit === 'C' ? '°C' : unit === 'F' ? '°F' : tr('unit|Automatic'),
@@ -1238,8 +1275,10 @@
     setClass($('shelfedit'), 'open', false);
     setClass($('langpick'), 'open', false);
     setClass($('poweronpick'), 'open', false);
+    setClass($('usbpick'), 'open', false);
     langHint = null;
     poweronHint = null;
+    usbHint = null;
     st.zone = Z.SETTINGS;
     if (!keepRow) st.row = 0;
     renderSettings();
@@ -1384,6 +1423,103 @@
     openSettings(true);
     for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].poweron) st.row = i;
     updateFocus();
+  }
+
+  // MARK: - USB Photo Source Picker
+
+  var usbHint = null;
+  var usbChoices = [
+    {id: 'rescan', title: 'Sincronizar / Re-escanear Pendrive USB'},
+    {id: 'auto', title: 'Automático (Pasta fotos no Pendrive)'}
+  ];
+
+  function usbSourceLabel() {
+    var cur = Prefs.usbPhotosDir();
+    var count = WALLPAPER_CATALOG.personal.length;
+    var suffix = count ? (' (' + count + ' fotos)') : '';
+    if (!cur || cur === 'auto') return 'Automático' + suffix;
+    var shortName = cur.replace(/^\/tmp\/usb\/[^/]+\/[^/]+/, 'USB').replace(/^\/media\/multimedia\/[^/]+/, 'USB');
+    return shortName + suffix;
+  }
+
+  function renderUsbPicker() {
+    var box = $('usbpick').firstChild, currentId = Prefs.usbPhotosDir() || 'auto';
+    box.innerHTML = '';
+    var title = el('div', 'title', box, '‹  Fonte das Fotos (USB)');
+    title.style.cursor = 'pointer';
+    title.onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); closeUsbPicker(false); };
+    var list = el('div', 'list', box), holder = el('div', 'rows', list);
+    list.style.height = Math.min(usbChoices.length, 7) * 78 + 'px';
+    for (var i = 0; i < usbChoices.length; i++) {
+      var row = el('div', 'row', holder, usbChoices[i].title);
+      if (usbChoices[i].id === currentId) sym('check', el('span', 'value', row));
+      hover(row, Z.USB, i);
+    }
+    usbHint = el('div', 'hint', box);
+    updateFocus();
+  }
+
+  function openUsbPicker() {
+    lastZoneSwitchAt = Date.now();
+    setClass($('settings'), 'open', false);
+    st.zone = Z.USB;
+    st.usb = 0;
+    usbChoices = [
+      {id: 'rescan', title: 'Sincronizar / Re-escanear Pendrive USB'},
+      {id: 'auto', title: 'Automático (Detectar pasta fotos)'}
+    ];
+    renderUsbPicker();
+    setClass($('usbpick'), 'open', true);
+    updateFocus();
+
+    TV.listUsbPhotoFolders(function (folders) {
+      if (st.zone !== Z.USB) return;
+      var list = [
+        {id: 'rescan', title: 'Sincronizar / Re-escanear Pendrive USB'},
+        {id: 'auto', title: 'Automático (Detectar pasta fotos)'}
+      ];
+      for (var i = 0; folders && i < folders.length; i++) {
+        var f = folders[i];
+        var label = f.replace(/^\/tmp\/usb\/[^/]+\/[^/]+/, 'Pendrive USB').replace(/^\/media\/multimedia\/[^/]+/, 'Pendrive USB');
+        list.push({id: f, title: label + ' (' + f + ')'});
+      }
+      usbChoices = list;
+      var cur = Prefs.usbPhotosDir() || 'auto';
+      for (var j = 0; j < usbChoices.length; j++) {
+        if (usbChoices[j].id === cur) { st.usb = j; break; }
+      }
+      renderUsbPicker();
+    });
+  }
+
+  function closeUsbPicker(pick) {
+    lastZoneSwitchAt = Date.now();
+    setClass($('usbpick'), 'open', false);
+    usbHint = null;
+    var choice = usbChoices[st.usb];
+    openSettings(true);
+    for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].usb) st.row = i;
+    updateFocus();
+
+    if (pick && choice) {
+      var forceRescan = (choice.id === 'rescan');
+      var targetDir = forceRescan ? Prefs.usbPhotosDir() : choice.id;
+      if (!forceRescan) {
+        Prefs.set('usbPhotosDir', targetDir);
+        Prefs.set('wallpaperMode', 'personal');
+      }
+      toast(forceRescan ? 'Re-escaneando pendrive USB...' : 'Sincronizando pasta do pendrive USB...');
+      TV.syncUsbPhotos(targetDir, forceRescan, function () {
+        loadPersonalManifest(function (count) {
+          if (count > 0) {
+            toast('Galeria USB pronta: ' + count + ' fotos pessoais carregadas!');
+          } else {
+            toast('Nenhuma foto (.jpg/.png) encontrada na pasta selecionada.');
+          }
+          if (st.zone === Z.SETTINGS) renderSettings();
+        }, true);
+      });
+    }
   }
 
   // MARK: - Shelf editor: which apps, in what order
@@ -1533,6 +1669,9 @@
       case Z.POWERON:
         closePowerOnPicker(true);
         return;
+      case Z.USB:
+        closeUsbPicker(true);
+        return;
     }
   }
 
@@ -1598,6 +1737,10 @@
         if (dy) st.poweron = Math.max(0, Math.min(powerOnChoices().length - 1, st.poweron + dy));
         else if (dx < 0) closePowerOnPicker(false);
         break;
+      case Z.USB:
+        if (dy) st.usb = Math.max(0, Math.min(usbChoices.length - 1, st.usb + dy));
+        else if (dx < 0) closeUsbPicker(false);
+        break;
     }
     updateFocus();
   }
@@ -1614,6 +1757,7 @@
     }
     if (st.zone === Z.LANG) { closeLanguages(false); return; }
     if (st.zone === Z.POWERON) { closePowerOnPicker(false); return; }
+    if (st.zone === Z.USB) { closeUsbPicker(false); return; }
     if (sheetOpen()) { closeSheets(); return; }
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
@@ -1624,7 +1768,7 @@
   function hover(node, zone, index) {
     node.onmouseover = function () {
       if (saverOn) return;
-      var isSheetZone = (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.POWERON);
+      var isSheetZone = (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.POWERON || zone === Z.USB);
       if (sheetOpen()) {
         if (st.zone !== zone) return;
       } else if (isSheetZone) {
@@ -1642,7 +1786,8 @@
                       (zone === Z.SETTINGS && st.row === index) ||
                       (zone === Z.EDIT && st.edit === index) ||
                       (zone === Z.LANG && st.lang === index) ||
-                      (zone === Z.POWERON && st.poweron === index);
+                      (zone === Z.POWERON && st.poweron === index) ||
+                      (zone === Z.USB && st.usb === index);
       if (prevZone === zone && sameIndex) return;
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
@@ -1654,6 +1799,7 @@
       else if (zone === Z.EDIT) st.edit = index;
       else if (zone === Z.LANG) st.lang = index;
       else if (zone === Z.POWERON) st.poweron = index;
+      else if (zone === Z.USB) st.usb = index;
       updateFocus(true);
     };
     node.onclick = function (e) {

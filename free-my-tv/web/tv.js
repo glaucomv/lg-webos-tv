@@ -493,6 +493,48 @@ var TV = (function () {
       luna('luna://org.webosbrew.hbchannel.service/exec', {command: cmd}, function (res) {
         if (done) done(!!res);
       });
+    },
+
+    /** List candidate photo folders on connected USB drives */
+    listUsbPhotoFolders: function (done) {
+      if (!webos) {
+        if (done) setTimeout(function () { done(['/tmp/usb/sda/sda1/fotos']); }, 0);
+        return;
+      }
+      var cmd = 'for d in /tmp/usb/*/*/* /tmp/usb/*/* /media/multimedia/*/* /media/multimedia/*; do ' +
+                'if [ -d "$d" ]; then ' +
+                'case "$d" in *"System Volume Information"*|*"$RECYCLE"*|*/.*) continue ;; esac; ' +
+                'echo "$d"; ' +
+                'fi; done';
+      luna('luna://org.webosbrew.hbchannel.service/exec', {command: cmd}, function (res) {
+        var out = [];
+        var raw = (res && res.stdoutString) || '';
+        var lines = raw.split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].replace(/^\s+|\s+$/g, '');
+          if (line && out.indexOf(line) < 0) out.push(line);
+        }
+        if (done) done(out);
+      });
+    },
+
+    /** Configure USB photo folder and trigger 15-sync-usb-photos.sh */
+    syncUsbPhotos: function (folderPath, forceRescan, done) {
+      if (!webos) {
+        if (done) setTimeout(function () { done(true); }, 0);
+        return;
+      }
+      var cfgCmd = '';
+      if (folderPath === 'auto') {
+        cfgCmd = 'rm -f /var/lib/webosbrew/usb_photos_dir; ';
+      } else if (folderPath && /^\/(tmp\/usb|media\/multimedia)\/[a-zA-Z0-9._\/ -]+$/.test(folderPath)) {
+        cfgCmd = 'printf "%s" "' + folderPath + '" > /var/lib/webosbrew/usb_photos_dir; ';
+      }
+      var flag = forceRescan ? ' --rescan' : '';
+      var cmd = cfgCmd + '/bin/sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh' + flag;
+      luna('luna://org.webosbrew.hbchannel.service/exec', {command: cmd}, function (res) {
+        if (done) done(!!res);
+      });
     }
   };
 })();
