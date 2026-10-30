@@ -2115,13 +2115,16 @@
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    // LG webOS dispara keyCode 1536 (cursor show) e 1537 (cursor hide) quando o ponteiro do Magic Remote aparece/some
+    if (k === 1536 || k === 1537) return;
     idleAt = Date.now();
     if (saverOn) {
       if (k === TV.keys.right) { if (saverStepFn) saverStepFn(1); }
       else if (k === TV.keys.left) { if (saverStepFn) saverStepFn(-1); }
       else if (k === TV.keys.ok || k === 415 || k === 19 || k === 32) { if (saverPauseFn) saverPauseFn(); }
       else if (k === TV.keys.up || k === TV.keys.down) { if (saverHudFn) saverHudFn(); }
-      else { hideSaver(); }
+      else if (k === TV.keys.back || k === 461 || k === 27 || k === 8 || k === 10009) { hideSaver(); }
+      else return;
       e.preventDefault();
       return;
     }
