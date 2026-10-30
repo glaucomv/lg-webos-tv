@@ -1,4 +1,5 @@
 import http.server
+import socket
 import socketserver
 import threading
 import time
@@ -10,7 +11,22 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FREE_MY_TV_DIR = os.path.join(ROOT_DIR, "free-my-tv")
 
 TV_IP = get_env_var("TV_IP", "192.168.1.100")
-HOST_IP = get_env_var("HOST_DEPLOY_IP", "192.168.1.50")
+
+
+def detect_host_ip(target_ip):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((target_ip, 23))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return get_env_var("HOST_DEPLOY_IP", "192.168.1.50")
+
+
+HOST_IP = detect_host_ip(TV_IP)
 PORT = int(get_env_var("DEPLOY_HTTP_PORT", "8999"))
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -40,8 +56,12 @@ def deploy():
     time.sleep(0.5)
 
     print("TV downloading IPK...")
-    dl_res = telnet_cmd(f"curl -s -f -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk", timeout=10)
+    dl_res = telnet_cmd(f"rm -f /tmp/freemytv.ipk && curl -s -f -o /tmp/freemytv.ipk http://{HOST_IP}:{PORT}/FreeMyTV-webos.ipk && ls -lh /tmp/freemytv.ipk", timeout=12)
     print("TV download result:", dl_res)
+    if "/tmp/freemytv.ipk" not in dl_res:
+        server.shutdown()
+        print("ERROR: TV failed to download IPK from host HTTP server!")
+        sys.exit(1)
 
     print("Closing running instance if any...")
     telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/close '{\"id\":\"io.freemytv\"}'")
