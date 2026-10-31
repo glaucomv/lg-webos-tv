@@ -448,12 +448,17 @@
 
   var currentLiveVideoApp = null;
   var lastSpotAppId = null;
+  var livePreviewTimer = 0;
 
   function safeCssUrl(url) {
     return String(url || '').replace(/[\r\n"\\()]/g, '');
   }
 
   function stopLivePreview() {
+    if (livePreviewTimer) {
+      clearTimeout(livePreviewTimer);
+      livePreviewTimer = 0;
+    }
     var vid = $('tv-live-preview');
     if (vid && currentLiveVideoApp) {
       currentLiveVideoApp = null;
@@ -502,17 +507,49 @@
     if (chName) chName.textContent = meta.channelName || meta.title;
     if (subText) subText.textContent = meta.subText || meta.hint;
 
-    if (vid) {
-      stopLivePreview();
-      vid.style.display = 'none';
-    }
-    lastSpotAppId = app.id;
-
     if (isLiveTV) {
       if (pulseDot) setClass(pulseDot, 'pulse-hidden', false);
       if (badgeText) badgeText.textContent = 'AO VIVO';
       if (pBadge) pBadge.style.background = 'rgba(220, 38, 38, 0.9)';
+
+      if (vid && !document.hidden && !saverOn) {
+        if (currentLiveVideoApp !== app.id) {
+          if (appImg) {
+            appImg.style.display = 'block';
+            appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
+          }
+          clearTimeout(livePreviewTimer);
+          livePreviewTimer = setTimeout(function () {
+            livePreviewTimer = 0;
+            var curApp = shelf[st.shelf] || shelf[0];
+            if (document.hidden || saverOn || !curApp || curApp.id !== 'com.webos.app.livetv') return;
+            if (appImg) appImg.style.display = 'none';
+            vid.style.display = 'block';
+            if (currentLiveVideoApp !== curApp.id) {
+              currentLiveVideoApp = curApp.id;
+              while (vid.firstChild) vid.removeChild(vid.firstChild);
+              var src = document.createElement('source');
+              src.src = 'tv://';
+              src.type = 'service/webos-broadcast';
+              vid.appendChild(src);
+              vid.muted = true;
+              vid.load();
+              var p = vid.play();
+              if (p && p.catch) p.catch(function () {});
+            }
+          }, 500);
+        } else {
+          if (appImg) appImg.style.display = 'none';
+          vid.style.display = 'block';
+        }
+      }
     } else {
+      if (vid) {
+        stopLivePreview();
+        lastSpotAppId = app.id;
+        vid.style.display = 'none';
+      }
+
       if (pulseDot) setClass(pulseDot, 'pulse-hidden', true);
       if (badgeText) badgeText.textContent = meta.badge || 'STREAMING';
       if (pBadge) {
@@ -524,11 +561,11 @@
           pBadge.style.background = 'rgba(0, 122, 255, 0.88)';
         }
       }
-    }
 
-    if (appImg) {
-      appImg.style.display = 'block';
-      appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
+      if (appImg) {
+        appImg.style.display = 'block';
+        appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
+      }
     }
   }
 
@@ -1643,6 +1680,7 @@
 
   function launcher(id, name) {
     return function () {
+      stopLivePreview();
       TV.launch(id, null, function (ok) {
         if (!ok) toast(trf("Couldn't open {app}.", {app: name || id}));
       });

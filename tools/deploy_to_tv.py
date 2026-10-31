@@ -89,6 +89,9 @@ def deploy():
             i_content = f.read().replace("\r\n", "\n")
         print("Updating 10-home-intercept.sh daemon on TV...")
         telnet_cmd(f"cat << 'EOF' > /var/lib/webosbrew/init.d/10-home-intercept.sh\n{i_content}\nEOF\nchmod +x /var/lib/webosbrew/init.d/10-home-intercept.sh", timeout=8)
+        telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/setDefaultApp '{\"category\":\"home\",\"appId\":\"io.freemytv\"}' >/dev/null 2>&1 || true", timeout=5)
+        telnet_cmd("luna-send -n 1 luna://com.webos.service.config/setConfigs '{\"configs\":{\"com.webos.applicationManager.keepAliveApps\":[\"io.freemytv\",\"com.webos.app.livemenu\",\"com.webos.app.voice\"]}}' >/dev/null 2>&1 || true", timeout=5)
+        telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/closeByAppId '{\"id\":\"com.webos.app.home\"}' >/dev/null 2>&1 || true", timeout=5)
         telnet_cmd("ps -ef | grep -E 'app-id=(yandex\\.alice|amazon\\.alexapr|com\\.webos\\.app\\.lgchannels)' | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null || true", timeout=8)
 
     print("Launching Free My TV...")

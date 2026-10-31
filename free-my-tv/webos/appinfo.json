@@ -12,5 +12,7 @@
   "handlesRelaunch": true,
   "disableBackHistoryAPI": true,
   "transparent": true,
+  "noSplashOnLaunch": true,
+  "appCategory": ["home"],
   "requiredPermissions": ["applications", "applications.launcher"]
 }

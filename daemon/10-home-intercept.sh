@@ -47,14 +47,18 @@ optimize_tv_system() {
         echo "::1 ad.lgappstv.com ibs.lgappstv.com yumenetworks.com smartclip.net smartclip.com lal.lgappstv.com cdpbeacon.lgtvsdp.com" >> /tmp/hosts
     fi
 
-    # 3. Stop LG admanager daemon and close background bloatware web apps if running
+    # 3. Register Free My TV as the native webOS Default Home App & Keep-Alive app so the Home button never opens LG Home
+    luna-send -n 1 luna://com.webos.applicationManager/setDefaultApp '{"category":"home","appId":"io.freemytv"}' >/dev/null 2>&1 || true
+    luna-send -n 1 luna://com.webos.service.config/setConfigs '{"configs":{"com.webos.applicationManager.keepAliveApps":["io.freemytv","com.webos.app.livemenu","com.webos.app.voice"]}}' >/dev/null 2>&1 || true
+
+    # 4. Stop LG admanager daemon and close background bloatware web apps & native LG Home if running
     killall -9 admanager 2>/dev/null || true
-    for BLOAT_APP in com.webos.app.lgchannels yandex.alice amazon.alexapr; do
+    for BLOAT_APP in com.webos.app.home com.webos.app.lgchannels yandex.alice amazon.alexapr; do
         luna-send -n 1 luna://com.webos.applicationManager/closeByAppId "{\"id\":\"$BLOAT_APP\"}" >/dev/null 2>&1 || true
     done
     ps -ef | grep -E 'app-id=(yandex\.alice|amazon\.alexapr|com\.webos\.app\.lgchannels)' | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null || true
 
-    # 4. Sync USB photos manifest once USB storage finishes mounting
+    # 5. Sync USB photos manifest once USB storage finishes mounting
     if [ -f /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh ]; then
         /bin/sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh >/dev/null 2>&1 || true
     fi
@@ -114,23 +118,14 @@ while true; do
     luna-send -i luna://com.webos.applicationManager/getForegroundAppInfo '{"subscribe":true}' 2>/dev/null | while read -r line; do
         case "$line" in
             *'"appId":"com.webos.app.home"'*)
-                # During cold boot (first 12s), webOS initializes com.webos.app.home before LiveTV.
-                # Ignore it unless the user configured a custom power-on app.
-                if [ -f /tmp/tv_boot_pending ]; then
-                    if TARGET=$(read_power_on_target); then
-                        rm -f /tmp/tv_boot_pending
-                        log_msg "Cold-boot Home detected -> Launching $TARGET"
-                        luna-send -n 1 luna://com.webos.applicationManager/launch "{\"id\":\"$TARGET\"}" >/dev/null 2>&1
-                    else
-                        log_msg "Ignoring com.webos.app.home pre-init during cold boot"
-                    fi
-                else
-                    NOW_TS=$(date +%s 2>/dev/null || echo 0)
-                    if [ $((NOW_TS - LAST_HOME_TS)) -ge 1 ]; then
-                        LAST_HOME_TS=$NOW_TS
-                        log_msg "Detected Home button -> Opening Free My TV"
-                        luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"io.freemytv"}' >/dev/null 2>&1
-                    fi
+                rm -f /tmp/tv_boot_pending
+                NOW_TS=$(date +%s 2>/dev/null || echo 0)
+                if [ $((NOW_TS - LAST_HOME_TS)) -ge 1 ]; then
+                    LAST_HOME_TS=$NOW_TS
+                    log_msg "Detected LG Home -> Redirecting to Free My TV"
+                    luna-send -n 1 luna://com.webos.applicationManager/setDefaultApp '{"category":"home","appId":"io.freemytv"}' >/dev/null 2>&1 || true
+                    luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"io.freemytv"}' >/dev/null 2>&1
+                    (sleep 1; luna-send -n 1 luna://com.webos.applicationManager/closeByAppId '{"id":"com.webos.app.home"}' >/dev/null 2>&1) &
                 fi
                 ;;
             *'"appId":"com.webos.app.livetv"'*)
