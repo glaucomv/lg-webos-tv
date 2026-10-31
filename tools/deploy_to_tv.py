@@ -64,7 +64,7 @@ def deploy():
         sys.exit(1)
 
     print("Closing running instance if any...")
-    telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/close '{\"id\":\"io.freemytv\"}'")
+    telnet_cmd("luna-send -n 1 luna://com.webos.applicationManager/closeByAppId '{\"id\":\"io.freemytv\"}'")
     time.sleep(1)
 
     print("Installing on TV via Luna appInstallService...")
@@ -77,11 +77,19 @@ def deploy():
     daemon_src = os.path.join(ROOT_DIR, "daemon", "15-sync-usb-photos.sh")
     if os.path.exists(daemon_src):
         with open(daemon_src, "r", encoding="utf-8") as f:
-            d_content = f.read()
+            d_content = f.read().replace("\r\n", "\n")
         print("Syncing USB photo manifest on TV...")
         telnet_cmd("mkdir -p /media/developer/apps/usr/palm/applications/io.freemytv/daemon")
         telnet_cmd(f"cat << 'EOF' > /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh\n{d_content}\nEOF\nchmod +x /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh", timeout=8)
         telnet_cmd("sh /media/developer/apps/usr/palm/applications/io.freemytv/daemon/15-sync-usb-photos.sh 2>/dev/null || true", timeout=20)
+
+    intercept_src = os.path.join(ROOT_DIR, "daemon", "10-home-intercept.sh")
+    if os.path.exists(intercept_src):
+        with open(intercept_src, "r", encoding="utf-8") as f:
+            i_content = f.read().replace("\r\n", "\n")
+        print("Updating 10-home-intercept.sh daemon on TV...")
+        telnet_cmd(f"cat << 'EOF' > /var/lib/webosbrew/init.d/10-home-intercept.sh\n{i_content}\nEOF\nchmod +x /var/lib/webosbrew/init.d/10-home-intercept.sh", timeout=8)
+        telnet_cmd("ps -ef | grep -E 'app-id=(yandex\\.alice|amazon\\.alexapr|com\\.webos\\.app\\.lgchannels)' | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null || true", timeout=8)
 
     print("Launching Free My TV...")
     for attempt in range(1, 7):

@@ -502,34 +502,17 @@
     if (chName) chName.textContent = meta.channelName || meta.title;
     if (subText) subText.textContent = meta.subText || meta.hint;
 
+    if (vid) {
+      stopLivePreview();
+      vid.style.display = 'none';
+    }
+    lastSpotAppId = app.id;
+
     if (isLiveTV) {
-      if (appImg) appImg.style.display = 'none';
       if (pulseDot) setClass(pulseDot, 'pulse-hidden', false);
       if (badgeText) badgeText.textContent = 'AO VIVO';
       if (pBadge) pBadge.style.background = 'rgba(220, 38, 38, 0.9)';
-
-      if (vid && !document.hidden) {
-        vid.style.display = 'block';
-        if (currentLiveVideoApp !== app.id) {
-          currentLiveVideoApp = app.id;
-          while (vid.firstChild) vid.removeChild(vid.firstChild);
-          var src = document.createElement('source');
-          src.src = 'tv://';
-          src.type = 'service/webos-broadcast';
-          vid.appendChild(src);
-          vid.muted = true;
-          vid.load();
-          var p = vid.play();
-          if (p && p.catch) p.catch(function () {});
-        }
-      }
     } else {
-      if (vid) {
-        stopLivePreview();
-        lastSpotAppId = app.id;
-        vid.style.display = 'none';
-      }
-
       if (pulseDot) setClass(pulseDot, 'pulse-hidden', true);
       if (badgeText) badgeText.textContent = meta.badge || 'STREAMING';
       if (pBadge) {
@@ -541,11 +524,11 @@
           pBadge.style.background = 'rgba(0, 122, 255, 0.88)';
         }
       }
+    }
 
-      if (appImg) {
-        appImg.style.display = 'block';
-        appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
-      }
+    if (appImg) {
+      appImg.style.display = 'block';
+      appImg.style.backgroundImage = 'url("' + safeCssUrl(meta.preview || 'wallpapers/aurora.jpg') + '")';
     }
   }
 
@@ -1028,12 +1011,14 @@
     tileStep = tw + gap;
     tileLeft = left;
     shelfFirst = Math.max(0, Math.min(shelfFirst, shelf.length - n));
+    st.shelf = Math.min(st.shelf, Math.max(0, shelf.length - 1));
     for (var i = 0; i < shelf.length; i++) {
       var t = el('div', 'tile', tiles);
       t.style.top = (854 + 126 - th) + 'px';
       t.style.width = tw + 'px';
       t.style.height = th + 'px';
       face(shelf[i], t, wordFit(shelf[i].title, tw, 30));
+      setClass(t, 'focus', st.zone === Z.SHELF && st.shelf === i);
       hover(t, Z.SHELF, i);
     }
     // More apps than fit: a small arrow inside the glass's edge on each side that has more, where no tile reaches
@@ -1045,7 +1030,6 @@
       arrow.style.left = (a ? width + 2 * pad - 14 : 14) - 8.5 + 'px';
       arrow.style.top = (pad + th / 2 - 8.5) + 'px';
     }
-    st.shelf = Math.min(st.shelf, Math.max(0, shelf.length - 1));
     placeTiles();
   }
 
@@ -1830,7 +1814,7 @@
                       (zone === Z.LANG && st.lang === index) ||
                       (zone === Z.POWERON && st.poweron === index) ||
                       (zone === Z.USB && st.usb === index);
-      if (prevZone === zone && sameIndex) return;
+      if (prevZone === zone && sameIndex && hasClass(node, 'focus')) return;
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
@@ -1844,6 +1828,8 @@
       else if (zone === Z.USB) st.usb = index;
       updateFocus(true);
     };
+    node.onmouseenter = node.onmouseover;
+    node.onmousemove = node.onmouseover;
     node.onclick = function (e) {
       if (e && e.stopPropagation) e.stopPropagation();
       if (sheetOpen() && st.zone !== zone) return;
@@ -2091,6 +2077,7 @@
   }
 
   function hideSaver() {
+    idleAt = Date.now();
     if (!saverOn) return;
     saverOn = false;
     saverPaused = false;
@@ -2101,8 +2088,11 @@
     setClass(s, 'on', false);
     setTimeout(function () {
       if (!saverOn && s) s.innerHTML = '';
-    }, 1250);
-    if (!document.hidden && shelf.length) updateSpotlight(true);
+    }, 950);
+    if (!document.hidden && shelf.length) {
+      updateSpotlight(true);
+      updateFocus();
+    }
   }
 
   function poke() {
@@ -2175,6 +2165,8 @@
     return false;
   }
 
+  var lastLoadAppsAt = 0;
+
   function loadApps(done) {
     TV.apps(function (list) {
       apps = list.filter(function (a) { return !hidden(a); });
@@ -2187,8 +2179,29 @@
     });
   }
 
+  function refreshOnWake() {
+    var now = Date.now();
+    idleAt = now;
+    if (window.focus) {
+      try { window.focus(); } catch (e) {}
+    }
+    if (now - lastLoadAppsAt < 800) {
+      updateFocus();
+      return;
+    }
+    lastLoadAppsAt = now;
+    loadApps(function () {
+      renderShelf();
+      renderDrawer();
+      updateSpotlight(true);
+      updateFocus();
+      Data.refresh();
+    });
+  }
+
   /** Back to the home screen (the app was opened again): the shelf, everything closed, the first tab. */
   function reset() {
+    idleAt = Date.now();
     hideSaver();
     closeSheets();
     st.zone = Z.SHELF;
@@ -2208,7 +2221,7 @@
     // LG: with handlesRelaunch the app has to come to the front itself, or opening it again while it runs shows nothing.
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
-    loadApps(function () { renderShelf(); renderDrawer(); Data.refresh(); });
+    refreshOnWake();
   }
 
   window.addEventListener('resize', fit);
@@ -2221,9 +2234,8 @@
       stopLivePreview();
       return;
     }
-    idleAt = Date.now();
     startWallpaperTimer();
-    loadApps(function () { renderShelf(); renderDrawer(); updateSpotlight(true); updateFocus(); Data.refresh(); });
+    refreshOnWake();
   });
 
   I18N.set(Prefs.language());
